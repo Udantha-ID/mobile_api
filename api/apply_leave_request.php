@@ -103,34 +103,55 @@ try {
       $leaveTypeName = "Casual Leave";
       break;
   }
-  
-  $remaining = null;
 
-  if ($mustCheckBalance) {
-    $sqlBal = "
-      SELECT remaining
-      FROM employee_leave_balances
+$remaining = null;
+
+if ($mustCheckBalance) {
+
+  // 1) Try current remaining from employee_leave_balances (updated on approvals)
+  $sqlBal = "
+    SELECT remaining
+    FROM employee_leave_balances
+    WHERE employee_id = ? AND leave_policy_id = ?
+    LIMIT 1
+  ";
+  $st = $conn->prepare($sqlBal);
+  $st->bind_param("ii", $employeeId, $leavePolicyId);
+  $st->execute();
+  $row = $st->get_result()->fetch_assoc();
+  $st->close();
+
+  if ($row) {
+    // Normal case (balance table exists)
+    $remaining = (float)$row["remaining"];
+  } else {
+    // 2) Fallback: use yearly entitlement for new employees
+    $sqlEnt = "
+      SELECT leave_entitlement
+      FROM employee_yearly_leave_balance
       WHERE employee_id = ? AND leave_policy_id = ?
       LIMIT 1
     ";
-    $st = $conn->prepare($sqlBal);
+    $st = $conn->prepare($sqlEnt);
     $st->bind_param("ii", $employeeId, $leavePolicyId);
     $st->execute();
-    $row = $st->get_result()->fetch_assoc();
+    $rowEnt = $st->get_result()->fetch_assoc();
     $st->close();
 
-    $remaining = $row ? (float)$row["remaining"] : 0.0;
-
-    if ($remaining <= 0) {
-      http_response_code(409);
-      respond(false, "You don't have available $leaveTypeName Balance");    
-    }
-
-    if ($days > $remaining) {
-      http_response_code(409);
-      respond(false, "Not enough $leaveTypeName balance. Remaining: {$remaining} day(s).");    
-    }
+    $remaining = $rowEnt ? (float)$rowEnt["leave_entitlement"] : 0.0;
   }
+
+  // 3) Validate
+  if ($remaining <= 0) {
+    http_response_code(409);
+    respond(false, "You don't have available $leaveTypeName Balance");
+  }
+
+  if ($days > $remaining) {
+    http_response_code(409);
+    respond(false, "Not enough $leaveTypeName balance. Remaining: {$remaining} day(s).");
+  }
+}
 
   // Reliever can be NULL
   $overseeMemberIdDb = ($overseeMemberId === "") ? null : $overseeMemberId;
