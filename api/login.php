@@ -55,7 +55,6 @@ try {
     echo json_encode(["success" => false, "message" => "Email and password required"]);
     exit;
   }
-
   $sql = "
     SELECT
       u.id AS user_id,
@@ -73,16 +72,18 @@ try {
       d.name AS department_name,
 
       ej.job_title_id,
+      jt.name AS job_title_name,
+
       ej.employment_type,
       ej.employment_level,
       ej.date_of_joining,
       ej.probation_end_date,
       ej.reporting_manager_id,
 
-      -- WORK EMAIL (from contacts table)
+      -- WORK EMAIL
       cwe.contact_value AS work_email,
 
-      -- PHONE (Whatsapp/Mobile)
+      -- PHONE
       cph.contact_value AS phone_number,
 
       -- manager details
@@ -92,22 +93,31 @@ try {
 
     FROM users u
     JOIN employees e ON e.employee_id = u.employee_id
-    LEFT JOIN employee_job ej ON ej.employee_id = e.employee_id
-    LEFT JOIN departments d ON d.department_id = ej.department_id
+
+    LEFT JOIN employee_job ej 
+      ON ej.employee_id = e.employee_id
+
+    LEFT JOIN departments d 
+      ON d.department_id = ej.department_id
+
+    LEFT JOIN job_titles jt 
+      ON jt.job_title_id = ej.job_title_id
 
     -- Work Email
     LEFT JOIN employee_contacts cwe
       ON cwe.employee_id = e.employee_id
-    AND cwe.contact_type = 'Work Email'
-    AND cwe.is_primary = 1
+      AND cwe.contact_type = 'Work Email'
+      AND cwe.is_primary = 1
 
-    -- Phone (choose Whatsapp Number as phone)
+    -- Phone
     LEFT JOIN employee_contacts cph
       ON cph.employee_id = e.employee_id
-    AND cph.contact_type IN ('Whatsapp Number','Mobile','MOBILE','Phone')
-    AND cph.is_primary = 1
+      AND cph.contact_type IN ('Whatsapp Number','Mobile','MOBILE','Phone')
+      AND cph.is_primary = 1
 
-    LEFT JOIN employees m ON m.employee_id = ej.reporting_manager_id
+    -- Manager
+    LEFT JOIN employees m 
+      ON m.employee_id = ej.reporting_manager_id
 
     WHERE u.email = ?
     LIMIT 1
@@ -186,6 +196,7 @@ try {
       "department" => $row["department_name"] ?? "",
 
       "jobTitleId" => $row["job_title_id"] ?? null,
+      "jobTitle" => $row["job_title_name"] ?? "",
       "employmentType" => $row["employment_type"] ?? null,
       "employmentLevel" => $row["employment_level"] ?? null,
       "dateOfJoining" => $row["date_of_joining"] ?? null,
