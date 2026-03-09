@@ -43,7 +43,6 @@ if ($trip_code === "" || strlen($trip_code) > 30) {
 $trip_id = (int)$trip_id;
 
 try {
-  // 1. Get current trip details
   $checkSql = "
     SELECT
       id,
@@ -75,24 +74,19 @@ try {
   $vehicleNo = trim($trip["vehicle_no"] ?? "");
   $isVehicleAssigned = (int)($trip["is_vehicle_assigned"] ?? 0);
 
-  // 2. Status must be ASSIGNED
   if ($currentStatus !== "ASSIGNED") {
     respond(false, "Trip status must be ASSIGNED to generate code");
   }
 
-  // 3. Vehicle must be assigned
   if ($isVehicleAssigned !== 1 || $vehicleNo === "") {
     respond(false, "Vehicle is not assigned to this trip");
   }
 
-  // 4. Check same vehicle in other trips
   $conflictSql = "
     SELECT
       ts.id,
       ts.status,
-      ts.trip_code,
-      ts.assigned_start_at,
-      ts.employee_id,
+      ts.type,
       COALESCE(NULLIF(TRIM(e.preferred_name), ''), NULLIF(TRIM(e.full_name), ''), CONCAT('Employee ID ', ts.employee_id)) AS employee_name
     FROM transport_services ts
     LEFT JOIN employees e
@@ -110,23 +104,25 @@ try {
     $stmt2->execute();
     $res2 = $stmt2->get_result();
 
-    if ($res2->num_rows > 0) {
+   if ($res2->num_rows > 0) {
     $conflict = $res2->fetch_assoc();
     $stmt2->close();
 
     $conflictStatus = strtoupper(trim($conflict["status"] ?? ""));
-    $employeeName = trim($conflict["employee_name"] ?? "another employee");
+    $employeeName = trim($conflict["employee_name"] ?? "Unknown");
+    $tripTypeRaw = strtolower(trim($conflict["type"] ?? "trip"));
+    $tripType = ucfirst($tripTypeRaw);
 
     if ($conflictStatus === "ASSIGNED") {
-      respond(false, "Vehicle $vehicleNo is already assigned to $employeeName's trip.");
+      respond(false, "Vehicle $vehicleNo is already assigned to $tripType trip, Chauffeur - $employeeName.");
     }
 
     if ($conflictStatus === "START_TRIP") {
-      respond(false, "Vehicle $vehicleNo is already reserved for $employeeName's trip.");
+      respond(false, "Vehicle $vehicleNo is already reserved for $tripType trip, Chauffeur - $employeeName.");
     }
 
     if ($conflictStatus === "IN_PROGRESS") {
-      respond(false, "Vehicle $vehicleNo is currently in progress with $employeeName's trip.");
+      respond(false, "Vehicle $vehicleNo is already in progress on $tripType trip, Chauffeur - $employeeName.");
     }
 
     respond(false, "Vehicle $vehicleNo is not available.");
@@ -134,7 +130,6 @@ try {
 
   $stmt2->close();
 
-  // 5. Update trip_code + status
   $updSql = "
     UPDATE transport_services
     SET
