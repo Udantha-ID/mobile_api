@@ -35,6 +35,7 @@ try {
       ts.id,
       ts.status,
       ts.vehicle_no,
+      ts.vehicle_type,
       ts.is_vehicle_assigned,
       ts.chauffer_reason,
       ts.pickup_location,
