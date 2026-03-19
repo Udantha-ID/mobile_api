@@ -56,63 +56,62 @@ $message = "External API call failed";
 $api_message = $message;
 $debug = null;
 
-if ($response === false || !empty($curlError)) {
-    $message = "External API call failed";
-    $api_message = $message;
-    $debug = [
-        "curl_error" => $curlError,
-        "http_code" => $httpCode,
-        "api_url" => $apiUrl
-    ];
-} else {
-    $decoded = json_decode($response, true);
-
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        $message = "Invalid JSON response from external API";
-        $api_message = "INVALID_JSON";
-
+    if ($response === false || !empty($curlError)) {
+        $message = "External API call failed";
+        $api_message = $message;
         $debug = [
-            "raw_response" => $response,
-            "http_code" => $httpCode
+            "curl_error" => $curlError,
+            "http_code" => $httpCode,
+            "api_url" => $apiUrl
         ];
-
     } else {
+        $decoded = json_decode($response, true);
 
-        if (
-            isset($decoded["status"]) &&
-            $decoded["status"] == true &&
-            isset($decoded["data"])
-        ) {
-            // SUCCESS
-            $is_qr_found = 1;
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $message = "Invalid JSON response from external API";
+            $api_message = "INVALID_JSON";
 
-            $message = "QR Loaded ✔️";
-            $api_message = "SUCCESS";
-
-            $returnData = [
-                "vehicle_number" => $decoded["data"]["vehicle_number"] ?? "",
-                "company_name" => $decoded["data"]["company_name"] ?? "",
-                "image" => $decoded["data"]["image"] ?? "",
+            $debug = [
+                "raw_response" => $response,
+                "http_code" => $httpCode
             ];
 
         } else {
-            // NOT FOUND
-            $message = $decoded["message"] ?? "QR code not found";
-            $api_message = "NOT_FOUND";
-        }
+
+    if (
+        !isset($decoded["status"]) ||
+        $decoded["status"] != true ||
+        !isset($decoded["data"]) ||
+        !is_array($decoded["data"])
+    ) {
+        respond(false, "QR code not found");
     }
+
+    $returnData = [
+        "vehicle_number" => $decoded["data"]["vehicle_number"] ?? "",
+        "company_name"   => $decoded["data"]["company_name"] ?? "",
+        "image"          => $decoded["data"]["image"] ?? ""
+    ];
+
+    /*
+    |--------------------------------------------------------------------------
+    | Save only when QR found
+    |--------------------------------------------------------------------------
+    */
+    $sql = "INSERT INTO vehicle_qr_search_logs
+            (employee_id, preferred_name, vehicle_number, searched_at, is_qr_found, api_message)
+            VALUES (?, ?, ?, NOW(), ?, ?)";
+
+    $stmt = $conn->prepare($sql);
+
+    if ($stmt) {
+        $is_qr_found = 1;
+        $api_message = "SUCCESS";
+        $stmt->bind_param("issis", $employee_id, $preferred_name, $vehicle_number, $is_qr_found, $api_message);
+        $stmt->execute();
+        $stmt->close();
+    }
+  }
 }
-
-$sql = "INSERT INTO vehicle_qr_search_logs 
-        (employee_id, preferred_name, vehicle_number, searched_at, is_qr_found, api_message)
-        VALUES (?, ?, ?, NOW(), ?, ?)";
-
-$stmt = $conn->prepare($sql);
-if ($stmt) {
-    $stmt->bind_param("issis", $employee_id, $preferred_name, $vehicle_number, $is_qr_found, $api_message);
-    $stmt->execute();
-    $stmt->close();
-}
-
 respond($is_qr_found == 1, $message, $returnData, $debug);
 ?>
