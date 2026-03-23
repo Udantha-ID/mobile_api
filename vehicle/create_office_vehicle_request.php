@@ -27,10 +27,12 @@ $from_date   = trim($body["from_date"] ?? "");
 $to_date     = trim($body["to_date"] ?? "");
 $destination = trim($body["destination"] ?? "");
 $reason      = trim($body["reason"] ?? "Office Service");
+$vehicle_type = trim($body["vehicle_type"] ?? "-");
 
 // New fields (employee name & phone)
 $chauffer_phone = trim($body["chauffer_phone"] ?? "");
 $chauffer_name  = trim($body["chauffer_name"] ?? "");
+
 
 // Validate
 if ($employee_id <= 0) respond(false, "employee_id required");
@@ -57,15 +59,12 @@ $status = "PENDING";
 try {
   $stmt = $conn->prepare("
     INSERT INTO transport_services
-      (source_id, type, vehicle_no, chauffer_phone, chauffer_name,
-       employee_id, manager_id, status,
-       assigned_start_at, pickup_location, dropoff_location, assigned_end_at,
-       passenger_count, trip_code, created_at, updated_at)
+      (source_id, type, vehicle_type, vehicle_no, chauffer_phone, chauffer_name,
+      employee_id, manager_id, status,
+      assigned_start_at, pickup_location, dropoff_location, assigned_end_at,
+      passenger_count, trip_code, created_at, updated_at)
     VALUES
-      (0, ?, ?, ?, ?,
-       ?, ?, ?,
-       ?, ?, ?, ?,
-       1, NULL, NOW(), NOW())
+      (0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, NOW(), NOW())
   ");
 
   // 11 params:
@@ -73,8 +72,9 @@ try {
   // employee_id(i), manager_id(i), status(s),
   // assigned_start_at(s), pickup_location(s), dropoff_location(s), assigned_end_at(s)
   $stmt->bind_param(
-    "ssssissssss",
+    "sssssissssss",
     $type,
+    $vehicle_type,
     $vehicle_no,
     $chauffer_phone,
     $chauffer_name,
