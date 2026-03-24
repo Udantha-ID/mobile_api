@@ -52,7 +52,7 @@ try {
       is_vehicle_assigned
     FROM transport_services
     WHERE id = ?
-      AND (type = 'shuttle' OR type = 'transfer')
+      AND (type = 'shuttle' OR type = 'transfers')
       AND deleted_at IS NULL
     LIMIT 1
   ";
