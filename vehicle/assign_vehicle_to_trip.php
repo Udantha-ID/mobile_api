@@ -57,7 +57,7 @@ try {
       updated_at = NOW()
     WHERE id = ?
       AND status = 'ASSIGNED'
-      AND type = 'transfer'
+      AND type = 'transfers'
       AND deleted_at IS NULL
   ";
 

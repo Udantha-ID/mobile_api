@@ -72,7 +72,7 @@ try {
       )
 
     WHERE ts.employee_id = ?
-      AND ts.type = 'transfer'
+      AND ts.type = 'transfers'
       AND ts.status = ?
       AND ts.deleted_at IS NULL
 
