@@ -58,6 +58,7 @@ try {
       )
 
     WHERE ts.employee_id = ?
+      AND ts.type = 'office'
       AND ts.deleted_at IS NULL
 
     ORDER BY ts.created_at DESC
