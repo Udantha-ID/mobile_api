@@ -41,7 +41,7 @@ try {
 
     WHERE ts.manager_id = ?
       AND ts.status = 'PENDING'
-      AND ts.type = 'office'
+      AND ts.type = 'personal'
       AND ts.deleted_at IS NULL
 
     ORDER BY ts.created_at DESC

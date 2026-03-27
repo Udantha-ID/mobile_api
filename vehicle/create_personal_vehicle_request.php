@@ -25,13 +25,16 @@ $manager_id  = (int)($body["manager_id"] ?? 0);
 $vehicle_no  = trim($body["vehicle_no"] ?? "");
 $from_date   = trim($body["from_date"] ?? "");
 $to_date     = trim($body["to_date"] ?? "");
-$destination = trim($body["destination"] ?? "");
+//$destination = trim($body["destination"] ?? "");
 $reason      = trim($body["reason"] ?? "Office Service");
 $vehicle_type = trim($body["vehicle_type"] ?? "-");
 
 // New fields (employee name & phone)
 $chauffer_phone = trim($body["chauffer_phone"] ?? "");
 $chauffer_name  = trim($body["chauffer_name"] ?? "");
+
+// New field: vehicle_id
+$vehicle_id = (int)($body["vehicle_id"] ?? 0);
 
 
 // Validate
@@ -43,6 +46,8 @@ if ($to_date === "") respond(false, "to_date required");
 //if ($destination === "") respond(false, "destination required");
 if ($chauffer_phone === "") respond(false, "chauffer_phone required");
 if ($chauffer_name === "") respond(false, "chauffer_name required");
+if ($vehicle_id <= 0) respond(false, "vehicle_id required");
+
 
 // convert date-only to DATETIME
 $assigned_start_at = $from_date . " 00:00:00";
@@ -58,13 +63,13 @@ $status = "PENDING";
 
 try {
   $stmt = $conn->prepare("
-    INSERT INTO transport_services
-      (source_id, type, vehicle_type, vehicle_no, chauffer_phone, chauffer_name,
-      employee_id, manager_id, status,
-      assigned_start_at, pickup_location, dropoff_location, assigned_end_at,
-      passenger_count, trip_code, created_at, updated_at)
-    VALUES
-      (0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, NOW(), NOW())
+      INSERT INTO transport_services
+        (source_id, type, vehicle_type, vehicle_id, vehicle_no, chauffer_phone, chauffer_name,
+        employee_id, manager_id, status,
+        assigned_start_at, pickup_location, dropoff_location, assigned_end_at,
+        passenger_count, trip_code, created_at, updated_at)
+      VALUES
+        (0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, NOW(), NOW())
   ");
 
   // 11 params:
@@ -72,19 +77,20 @@ try {
   // employee_id(i), manager_id(i), status(s),
   // assigned_start_at(s), pickup_location(s), dropoff_location(s), assigned_end_at(s)
   $stmt->bind_param(
-    "sssssissssss",
-    $type,
-    $vehicle_type,
-    $vehicle_no,
-    $chauffer_phone,
-    $chauffer_name,
-    $employee_id,
-    $manager_id,
-    $status,
-    $assigned_start_at,
-    $pickup_location,
-    $dropoff_location,
-    $assigned_end_at
+      "ssissssssssss",
+      $type,           // type
+      $vehicle_type,   // vehicle_type
+      $vehicle_id,     // vehicle_id
+      $vehicle_no,
+      $chauffer_phone,
+      $chauffer_name,
+      $employee_id,
+      $manager_id,
+      $status,
+      $assigned_start_at,
+      $pickup_location,
+      $dropoff_location,
+      $assigned_end_at
   );
 
   $stmt->execute();
