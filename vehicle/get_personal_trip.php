@@ -1,4 +1,5 @@
 <?php
+
 header("Content-Type: application/json; charset=UTF-8");
 require_once __DIR__ . "/../assets/includes/db_connect.php";
 
@@ -17,7 +18,7 @@ function respond($success, $message, $data = []) {
 $employee_id = trim($_GET["employee_id"] ?? "");
 $status      = strtoupper(trim($_GET["status"] ?? ""));
 
-$allowed = ["PENDING", "APPROVED", "START_TRIP", "IN_PROGRESS", "COMPLETED"];
+$allowed = ["PENDING", "HOD_APPROVED", "APPROVED", "START_TRIP", "IN_PROGRESS", "COMPLETED"];
 
 if ($employee_id === "" || !ctype_digit($employee_id)) {
   respond(false, "employee_id is required and must be numeric");
@@ -30,18 +31,23 @@ $employee_id = (int)$employee_id;
 
 try {
 
-  // Latest trip_details row per transport_service_id
   $sql = "
     SELECT
       ts.id,
       ts.status,
+      ts.type,
+      ts.vehicle_type,
       ts.vehicle_no,
+      ts.vehicle_id,
+      ts.is_vehicle_assigned,
+      ts.chauffer_reason,
       ts.pickup_location,
       ts.dropoff_location,
       ts.passenger_count,
       ts.assigned_start_at,
       ts.assigned_end_at,
       ts.trip_code,
+      ts.hod_comment,
 
       td.trip_start_datetime,
       td.trip_end_datetime,
