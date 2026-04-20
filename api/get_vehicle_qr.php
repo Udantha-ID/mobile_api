@@ -30,7 +30,7 @@ if (!ctype_digit($employee_id)) {
 
 $vehicle_number = strtoupper($vehicle_number);
 
-$apiUrl = "https://exploredrive.lk/api/vehicle-details/" . urlencode($vehicle_number);
+$apiUrl = "https://srilankaautorentals.com/api/vehicle-details/" . urlencode($vehicle_number);
 
 $ch = curl_init();
 curl_setopt_array($ch, [

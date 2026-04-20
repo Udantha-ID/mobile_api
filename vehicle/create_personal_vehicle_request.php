@@ -61,7 +61,42 @@ $dropoff_location = $destination;
 $type = "personal";
 $status = "PENDING";
 
+// // Check if user already has a PENDING request
+// $checkStmt = $conn->prepare("
+//     SELECT id FROM transport_services 
+//     WHERE employee_id = ? AND status = 'PENDING' AND type = 'personal'
+//     LIMIT 1
+// ");
+
+// $checkStmt->bind_param("i", $employee_id);
+// $checkStmt->execute();
+// $result = $checkStmt->get_result();
+
+// if ($result->num_rows > 0) {
+//     respond(false, "You already have a pending request. Please wait until it is completed or canceled.");
+// }
+
+// $checkStmt->close();
+
 try {
+
+// Check if user already has a PENDING request
+$checkStmt = $conn->prepare("
+    SELECT id FROM transport_services 
+    WHERE employee_id = ? AND status = 'PENDING' AND type = 'personal'
+    LIMIT 1
+");
+
+$checkStmt->bind_param("i", $employee_id);
+$checkStmt->execute();
+$result = $checkStmt->get_result();
+
+if ($result->num_rows > 0) {
+    respond(false, "You already have a pending request. You can cancel your request or wait until it is completed.");
+}
+
+$checkStmt->close();
+
   $stmt = $conn->prepare("
       INSERT INTO transport_services
         (source_id, type, vehicle_type, vehicle_id, vehicle_no, chauffer_phone, chauffer_name,

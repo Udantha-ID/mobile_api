@@ -116,7 +116,7 @@ try {
       "applyOn" => $row["requested_at"],
 
       // UI label for Flutter
-      "status" => "Awaiting Your Response",
+      "status" => "Waiting Reply",
 
       "managerComment" => $row["manager_comment"] ?? ""
     ];

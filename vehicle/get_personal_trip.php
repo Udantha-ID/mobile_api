@@ -18,7 +18,7 @@ function respond($success, $message, $data = []) {
 $employee_id = trim($_GET["employee_id"] ?? "");
 $status      = strtoupper(trim($_GET["status"] ?? ""));
 
-$allowed = ["PENDING", "HOD_APPROVED", "APPROVED", "START_TRIP", "IN_PROGRESS", "COMPLETED"];
+$allowed = ["PENDING","HOD_APPROVED","HOD_REJECTED","APPROVED","START_TRIP","IN_PROGRESS","COMPLETED","REJECTED"];
 
 if ($employee_id === "" || !ctype_digit($employee_id)) {
   respond(false, "employee_id is required and must be numeric");
@@ -48,6 +48,7 @@ try {
       ts.assigned_end_at,
       ts.trip_code,
       ts.hod_comment,
+      ts.reject_reason,
 
       td.trip_start_datetime,
       td.trip_end_datetime,

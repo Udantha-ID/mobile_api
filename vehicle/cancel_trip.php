@@ -26,7 +26,7 @@ try {
   $stmt = $conn->prepare("
     DELETE FROM transport_services
     WHERE id = ?
-      AND status IN ('PENDING','Pending','pending')
+      AND status IN ('PENDING','Pending','pending', 'HOD_REJECTED')
   ");
   $stmt->bind_param("i", $id);
   $stmt->execute();
