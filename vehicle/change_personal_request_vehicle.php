@@ -18,14 +18,14 @@ if (($_SERVER["REQUEST_METHOD"] ?? "") !== "POST") {
   respond(false, "Method not allowed");
 }
 
-$trip_id      = trim($_POST["trip_id"] ?? "");
-$vehicle_id   = trim($_POST["vehicle_id"] ?? "");
+$request_id = trim($_POST["request_id"] ?? "");
+$vehicle_id = trim($_POST["vehicle_id"] ?? "");
 $vehicle_type = trim($_POST["vehicle_type"] ?? "");
-$vehicle_no   = trim($_POST["vehicle_no"] ?? "");
-$reason       = trim($_POST["reason"] ?? "");
+$vehicle_no = trim($_POST["vehicle_no"] ?? "");
+$reason = trim($_POST["reason"] ?? "Changed by manager");
 
-if ($trip_id === "" || !ctype_digit($trip_id)) {
-  respond(false, "Valid trip_id is required");
+if ($request_id === "" || !ctype_digit($request_id)) {
+  respond(false, "Valid request_id is required");
 }
 
 if ($vehicle_id === "" || !ctype_digit($vehicle_id)) {
@@ -40,19 +40,32 @@ if ($vehicle_no === "") {
   respond(false, "Vehicle number is required");
 }
 
-if ($reason === "") {
-  respond(false, "Reason is required");
-}
-
 $allowedTypes = ["Car", "Van", "Bus", "SUV"];
 if (!in_array($vehicle_type, $allowedTypes, true)) {
   respond(false, "Invalid vehicle type");
 }
 
-$trip_id = (int)$trip_id;
+$request_id = (int)$request_id;
 $vehicle_id = (int)$vehicle_id;
 
 try {
+  $checkSql = "
+    SELECT id
+    FROM transport_services
+    WHERE id = ?
+      AND type = 'personal'
+      AND deleted_at IS NULL
+    LIMIT 1
+  ";
+  $checkStmt = $conn->prepare($checkSql);
+  $checkStmt->bind_param("i", $request_id);
+  $checkStmt->execute();
+  $checkRes = $checkStmt->get_result();
+  if (!$checkRes || $checkRes->num_rows === 0) {
+    respond(false, "Request not found");
+  }
+  $checkStmt->close();
+
   $sql = "
     UPDATE transport_services
     SET
@@ -63,19 +76,22 @@ try {
       is_vehicle_assigned = 1,
       updated_at = NOW()
     WHERE id = ?
-      AND status = 'ASSIGNED'
-      AND type = 'transfers'
+      AND type = 'personal'
       AND deleted_at IS NULL
   ";
 
   $stmt = $conn->prepare($sql);
-  $stmt->bind_param("isssi", $vehicle_id, $vehicle_type, $vehicle_no, $reason, $trip_id);
+  $stmt->bind_param("isssi", $vehicle_id, $vehicle_type, $vehicle_no, $reason, $request_id);
   $stmt->execute();
 
+  if ($stmt->errno) {
+    respond(false, "Update failed");
+  }
+
   if ($stmt->affected_rows > 0) {
-    respond(true, "Vehicle assigned successfully");
+    respond(true, "Personal request vehicle updated successfully");
   } else {
-    respond(false, "Trip not found or already updated");
+    respond(true, "No changes detected, request remains updated");
   }
 
   $stmt->close();
@@ -83,3 +99,4 @@ try {
   http_response_code(500);
   respond(false, "Server error");
 }
+

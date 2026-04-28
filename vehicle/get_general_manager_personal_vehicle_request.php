@@ -19,46 +19,46 @@ try {
     // HARD CODED GM ID
     $loggedInUserId = 14;
 
-    $sql = "
-        SELECT
-            ts.id AS request_id,
-            ts.employee_id,
-            ts.manager_id,
-            ts.status,
-            ts.type,
-            ts.vehicle_no,
-            ts.vehicle_id,
-            ts.chauffer_phone,
-            ts.chauffer_name,
-            ts.assigned_start_at,
-            ts.assigned_end_at,
-            ts.dropoff_location,
-            ts.pickup_location,
-            ts.trip_code,
-            ts.created_at,
-            ts.hod_comment,
+$sql = "
+    SELECT
+        ts.id AS request_id,
+        ts.employee_id,
+        ts.manager_id,
+        ts.status,
+        ts.type,
+        ts.vehicle_type,
+        ts.vehicle_no,
+        ts.vehicle_id,
+        ts.chauffer_phone,
+        ts.chauffer_name,
+        ts.assigned_start_at,
+        ts.assigned_end_at,
+        ts.dropoff_location,
+        ts.pickup_location,
+        ts.trip_code,
+        ts.created_at,
+        ts.hod_comment,
 
-            e.employee_code,
-            COALESCE(NULLIF(TRIM(e.preferred_name), ''), TRIM(e.full_name)) AS employee_name,
+        e.employee_code,
+        COALESCE(NULLIF(TRIM(e.preferred_name), ''), TRIM(e.full_name)) AS employee_name,
 
-            jt.job_title_id,
-            jt.name AS job_title_name
+        jt.job_title_id,
+        jt.name AS job_title_name
 
-        FROM transport_services ts
-        JOIN employees e ON e.employee_id = ts.employee_id
-        LEFT JOIN employee_job ej ON ej.employee_id = ts.employee_id
-        LEFT JOIN job_titles jt ON jt.job_title_id = ej.job_title_id
+    FROM transport_services ts
+    JOIN employees e ON e.employee_id = ts.employee_id
+    LEFT JOIN employee_job ej ON ej.employee_id = ts.employee_id
+    LEFT JOIN job_titles jt ON jt.job_title_id = ej.job_title_id
 
-        WHERE ts.type = 'personal'
-          AND ts.deleted_at IS NULL
-          AND (
-                ts.status = 'HOD_APPROVED'
-                OR (ts.status = 'PENDING' AND ts.manager_id = ?)
-          )
+    WHERE ts.type = 'personal'
+      AND ts.deleted_at IS NULL
+      AND (
+            ts.status = 'HOD_APPROVED'
+            OR (ts.status = 'PENDING' AND ts.manager_id = ?)
+      )
 
-        ORDER BY ts.created_at DESC
-    ";
-
+    ORDER BY ts.created_at DESC
+";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $loggedInUserId);
 
