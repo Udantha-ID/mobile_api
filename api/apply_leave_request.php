@@ -4,6 +4,9 @@ require_once __DIR__ . "/../assets/includes/db_connect.php";
 
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
+// Fix: Set Sri Lanka timezone for this DB session
+$conn->query("SET time_zone = '+05:30'");
+
 function respond($ok, $msg, $extra = []) {
   echo json_encode(array_merge(["success" => $ok, "message" => $msg], $extra));
   exit;
@@ -52,9 +55,6 @@ try {
     }
     // force same day
     $endDate = $startDate;
-
-    // You said: don't check balance for half day.
-    // We'll still store number_of_days as 1.0 (or change to 0.5 if your DB wants)
     $days = ($days > 0 ? $days : 1.0);
   } else {
     // normal leave must have endDate and days
@@ -69,7 +69,6 @@ try {
   $mustCheckBalance = in_array($leavePolicyId, [1, 2, 3], true);
 
   // ---------- 1) OVERLAP CHECK (block only PENDING / APPROVED) ----------
-  // overlap if existing.start <= new.end AND existing.end >= new.start
   $sqlOverlap = "
     SELECT COUNT(*) AS cnt
     FROM leave_requests
@@ -89,7 +88,6 @@ try {
   }
 
   // ---------- 2) BALANCE CHECK (only for 1,2,3) ----------
-  // Map leave_policy_id -> leave type name
   $leaveTypeName = "Leave";
 
   switch ($leavePolicyId) {
@@ -104,54 +102,53 @@ try {
       break;
   }
 
-$remaining = null;
+  $remaining = null;
 
-if ($mustCheckBalance) {
+  if ($mustCheckBalance) {
 
-  // 1) Try current remaining from employee_leave_balances (updated on approvals)
-  $sqlBal = "
-    SELECT remaining
-    FROM employee_leave_balances
-    WHERE employee_id = ? AND leave_policy_id = ?
-    LIMIT 1
-  ";
-  $st = $conn->prepare($sqlBal);
-  $st->bind_param("ii", $employeeId, $leavePolicyId);
-  $st->execute();
-  $row = $st->get_result()->fetch_assoc();
-  $st->close();
-
-  if ($row) {
-    // Normal case (balance table exists)
-    $remaining = (float)$row["remaining"];
-  } else {
-    // 2) Fallback: use yearly entitlement for new employees
-    $sqlEnt = "
-      SELECT leave_entitlement
-      FROM employee_yearly_leave_balance
+    // 1) Try current remaining from employee_leave_balances
+    $sqlBal = "
+      SELECT remaining
+      FROM employee_leave_balances
       WHERE employee_id = ? AND leave_policy_id = ?
       LIMIT 1
     ";
-    $st = $conn->prepare($sqlEnt);
+    $st = $conn->prepare($sqlBal);
     $st->bind_param("ii", $employeeId, $leavePolicyId);
     $st->execute();
-    $rowEnt = $st->get_result()->fetch_assoc();
+    $row = $st->get_result()->fetch_assoc();
     $st->close();
 
-    $remaining = $rowEnt ? (float)$rowEnt["leave_entitlement"] : 0.0;
-  }
+    if ($row) {
+      $remaining = (float)$row["remaining"];
+    } else {
+      // 2) Fallback: use yearly entitlement for new employees
+      $sqlEnt = "
+        SELECT leave_entitlement
+        FROM employee_yearly_leave_balance
+        WHERE employee_id = ? AND leave_policy_id = ?
+        LIMIT 1
+      ";
+      $st = $conn->prepare($sqlEnt);
+      $st->bind_param("ii", $employeeId, $leavePolicyId);
+      $st->execute();
+      $rowEnt = $st->get_result()->fetch_assoc();
+      $st->close();
 
-  // 3) Validate
-  if ($remaining <= 0) {
-    http_response_code(409);
-    respond(false, "You don't have available $leaveTypeName Balance");
-  }
+      $remaining = $rowEnt ? (float)$rowEnt["leave_entitlement"] : 0.0;
+    }
 
-  if ($days > $remaining) {
-    http_response_code(409);
-    respond(false, "Not enough $leaveTypeName balance. Remaining: {$remaining} day(s).");
+    // 3) Validate
+    if ($remaining <= 0) {
+      http_response_code(409);
+      respond(false, "You don't have available $leaveTypeName Balance");
+    }
+
+    if ($days > $remaining) {
+      http_response_code(409);
+      respond(false, "Not enough $leaveTypeName balance. Remaining: {$remaining} day(s).");
+    }
   }
-}
 
   // Reliever can be NULL
   $overseeMemberIdDb = ($overseeMemberId === "") ? null : $overseeMemberId;
@@ -170,19 +167,19 @@ if ($mustCheckBalance) {
 
   $stmt = $conn->prepare($sqlIns);
 
-$stmt->bind_param(
-  "iissdsssis",
-  $employeeId,        // i
-  $leavePolicyId,     // i
-  $startDate,         // s
-  $endDate,           // s
-  $days,              // d
-  $halfDaySession,    // s (can be NULL)
-  $reason,            // s
-  $overseeMemberIdDb, // s (can be NULL)
-  $isSpecial,         // i
-  $address            // s
-);
+  $stmt->bind_param(
+    "iissdsssis",
+    $employeeId,        // i
+    $leavePolicyId,     // i
+    $startDate,         // s
+    $endDate,           // s
+    $days,              // d
+    $halfDaySession,    // s (can be NULL)
+    $reason,            // s
+    $overseeMemberIdDb, // s (can be NULL)
+    $isSpecial,         // i
+    $address            // s
+  );
 
   $stmt->execute();
   $leaveRequestId = (int)$conn->insert_id;
@@ -191,7 +188,7 @@ $stmt->bind_param(
   // Done
   respond(true, "Leave request submitted", [
     "leave_request_id" => $leaveRequestId,
-    "remaining" => $remaining, // optional (null for half day)
+    "remaining" => $remaining,
   ]);
 
 } catch (Throwable $e) {

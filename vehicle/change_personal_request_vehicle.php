@@ -5,98 +5,117 @@ require_once __DIR__ . "/../assets/includes/db_connect.php";
 ini_set("display_errors", 0);
 error_reporting(E_ALL);
 
-function respond($success, $message) {
-  echo json_encode([
-    "success" => $success,
-    "message" => $message
-  ]);
-  exit;
+function respond($success, $message, $data = null) {
+    echo json_encode(["success" => $success, "message" => $message, "data" => $data]);
+    exit;
 }
 
 if (($_SERVER["REQUEST_METHOD"] ?? "") !== "POST") {
-  http_response_code(405);
-  respond(false, "Method not allowed");
+    http_response_code(405);
+    respond(false, "Method not allowed");
 }
 
-$request_id = trim($_POST["request_id"] ?? "");
-$vehicle_id = trim($_POST["vehicle_id"] ?? "");
-$vehicle_type = trim($_POST["vehicle_type"] ?? "");
-$vehicle_no = trim($_POST["vehicle_no"] ?? "");
-$reason = trim($_POST["reason"] ?? "Changed by manager");
+$raw  = file_get_contents("php://input");
+$body = json_decode($raw, true);
+if (!is_array($body)) respond(false, "Invalid JSON");
 
-if ($request_id === "" || !ctype_digit($request_id)) {
-  respond(false, "Valid request_id is required");
+// ── Required fields ───────────────────────────────────────────────────────
+$employee_id    = (int)   ($body["employee_id"]  ?? 0);
+$manager_id     = (int)   ($body["manager_id"]   ?? 0);
+$vehicle_no     = trim($body["vehicle_no"]   ?? "");
+$from_date      = trim($body["from_date"]    ?? "");
+$to_date        = trim($body["to_date"]      ?? "");
+$destination    = trim($body["destination"]  ?? "");
+$reason         = trim($body["reason"]       ?? "Office Service");
+$vehicle_type   = trim($body["vehicle_type"] ?? "-");
+$chauffer_phone = trim($body["chauffer_phone"] ?? "");
+$chauffer_name  = trim($body["chauffer_name"]  ?? "");
+$vehicle_id     = (int)($body["vehicle_id"] ?? 0);
+
+// ── Optional: companion employee IDs ─────────────────────────────────────
+$companion_employee_ids = null;
+if (
+    isset($body["companion_employee_ids"]) &&
+    is_array($body["companion_employee_ids"]) &&
+    count($body["companion_employee_ids"]) > 0
+) {
+    $companion_employee_ids = json_encode($body["companion_employee_ids"]);
 }
 
-if ($vehicle_id === "" || !ctype_digit($vehicle_id)) {
-  respond(false, "Valid vehicle_id is required");
-}
+// ── Validate ──────────────────────────────────────────────────────────────
+if ($employee_id    <= 0) respond(false, "employee_id required");
+if ($manager_id     <= 0) respond(false, "manager_id required");
+if ($vehicle_no    === "") respond(false, "vehicle_no required");
+if ($from_date     === "") respond(false, "from_date required");
+if ($to_date       === "") respond(false, "to_date required");
+if ($destination   === "") respond(false, "destination required");
+if ($chauffer_phone === "") respond(false, "chauffer_phone required");
+if ($chauffer_name  === "") respond(false, "chauffer_name required");
 
-if ($vehicle_type === "") {
-  respond(false, "Vehicle type is required");
-}
-
-if ($vehicle_no === "") {
-  respond(false, "Vehicle number is required");
-}
-
-$allowedTypes = ["Car", "Van", "Bus", "SUV"];
-if (!in_array($vehicle_type, $allowedTypes, true)) {
-  respond(false, "Invalid vehicle type");
-}
-
-$request_id = (int)$request_id;
-$vehicle_id = (int)$vehicle_id;
+// ── Build datetimes ───────────────────────────────────────────────────────
+$assigned_start_at = $from_date . " 00:00:00";
+$assigned_end_at   = $to_date   . " 23:59:59";
+$pickup_location   = "Head Office";
+$dropoff_location  = $destination;
+$type              = "office";
+$status            = "PENDING";
 
 try {
-  $checkSql = "
-    SELECT id
-    FROM transport_services
-    WHERE id = ?
-      AND type = 'personal'
-      AND deleted_at IS NULL
-    LIMIT 1
-  ";
-  $checkStmt = $conn->prepare($checkSql);
-  $checkStmt->bind_param("i", $request_id);
-  $checkStmt->execute();
-  $checkRes = $checkStmt->get_result();
-  if (!$checkRes || $checkRes->num_rows === 0) {
-    respond(false, "Request not found");
-  }
-  $checkStmt->close();
 
-  $sql = "
-    UPDATE transport_services
-    SET
-      vehicle_id = ?,
-      vehicle_type = ?,
-      vehicle_no = ?,
-      chauffer_reason = ?,
-      is_vehicle_assigned = 1,
-      updated_at = NOW()
-    WHERE id = ?
-      AND type = 'personal'
-      AND deleted_at IS NULL
-  ";
+    // Check for existing PENDING request
+    $chk = $conn->prepare("
+        SELECT id FROM transport_services
+        WHERE employee_id = ? AND status = 'PENDING' AND type = 'office'
+        LIMIT 1
+    ");
+    $chk->bind_param("i", $employee_id);
+    $chk->execute();
+    if ($chk->get_result()->num_rows > 0) {
+        respond(false, "You already have a pending request. Cancel it or wait until it is completed.");
+    }
+    $chk->close();
 
-  $stmt = $conn->prepare($sql);
-  $stmt->bind_param("isssi", $vehicle_id, $vehicle_type, $vehicle_no, $reason, $request_id);
-  $stmt->execute();
+    // ── Insert ────────────────────────────────────────────────────────────
+    $stmt = $conn->prepare("
+        INSERT INTO transport_services (
+            source_id, type, vehicle_type, vehicle_id, vehicle_no,
+            chauffer_phone, chauffer_name, employee_id, manager_id, status,
+            assigned_start_at, pickup_location, dropoff_location, assigned_end_at,
+            passenger_count, companion_employee_ids, trip_code, created_at, updated_at
+        ) VALUES (
+            0, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?,
+            1, ?, NULL, NOW(), NOW()
+        )
+    ");
 
-  if ($stmt->errno) {
-    respond(false, "Update failed");
-  }
+    // Types: s s i s s s i i s s s s s s
+    $stmt->bind_param(
+        "ssisssisssssss",
+        $type,
+        $vehicle_type,
+        $vehicle_id,
+        $vehicle_no,
+        $chauffer_phone,
+        $chauffer_name,
+        $employee_id,
+        $manager_id,
+        $status,
+        $assigned_start_at,
+        $pickup_location,
+        $dropoff_location,
+        $assigned_end_at,
+        $companion_employee_ids
+    );
 
-  if ($stmt->affected_rows > 0) {
-    respond(true, "Personal request vehicle updated successfully");
-  } else {
-    respond(true, "No changes detected, request remains updated");
-  }
+    $stmt->execute();
+    $id = $stmt->insert_id;
+    $stmt->close();
 
-  $stmt->close();
+    respond(true, "Request created", ["id" => $id]);
+
 } catch (Throwable $e) {
-  http_response_code(500);
-  respond(false, "Server error");
+    http_response_code(500);
+    respond(false, "Server error: " . $e->getMessage());
 }
-

@@ -9,16 +9,16 @@ function respond($success, $message, $data = null) {
   echo json_encode([
     "success" => $success,
     "message" => $message,
-    "data" => $data
+    "data"    => $data
   ]);
   exit;
 }
 
 function makeTripCode($employeeName) {
-  $clean = strtoupper(preg_replace('/\s+/', '', (string)$employeeName));
+  $clean    = strtoupper(preg_replace('/\s+/', '', (string)$employeeName));
   if (strlen($clean) < 4) $clean = str_pad($clean, 4, "X");
   $namePart = substr($clean, 0, 4);
-  $numPart = strval(random_int(1000, 9999));
+  $numPart  = strval(random_int(1000, 9999));
   return "#" . $namePart . $numPart;
 }
 
@@ -27,19 +27,19 @@ if (($_SERVER["REQUEST_METHOD"] ?? "") !== "POST") {
   respond(false, "Method not allowed");
 }
 
-$raw = file_get_contents("php://input");
+$raw  = file_get_contents("php://input");
 $body = json_decode($raw, true);
 if (!is_array($body)) respond(false, "Invalid JSON");
 
-$request_id = (int)($body["request_id"] ?? 0);
-$hod_comment = trim($body["hod_comment"] ?? "");
+$request_id  = (int)($body["request_id"]  ?? 0);
+$hod_comment = trim($body["hod_comment"]  ?? "");
 
 if ($request_id <= 0) respond(false, "request_id required");
 
 try {
 
   // ============================================================
-  // 1. LOAD REQUEST + MANAGER
+  // 1. LOAD REQUEST + EMPLOYEE NAME
   // ============================================================
   $stmt = $conn->prepare("
     SELECT
@@ -70,11 +70,11 @@ try {
   $employeeName = trim($row["preferred_name"] ?: $row["full_name"]);
   if ($employeeName === "") $employeeName = "USER";
 
-  $empId = (int)$row["employee_id"];
+  $empId     = (int)$row["employee_id"];
   $managerId = (int)$row["manager_id"];
 
   // ============================================================
-  // 2. CHECK IF MANAGER IS GM
+  // 2. CHECK IF APPROVING MANAGER IS GM (job_title_id = 15)
   // ============================================================
   $isGM = false;
 
@@ -97,23 +97,40 @@ try {
   $jobStmt->close();
 
   // ============================================================
+  // Helper: insert or increment employee_personal_vehicle_usage
+  // ============================================================
+  function recordUsage($conn, int $employeeId): void {
+    $u = $conn->prepare("
+      INSERT INTO employee_personal_vehicle_usage
+          (employee_id, usage_count, charge_per_request, created_at, updated_at)
+      VALUES (?, 1, 0.00, NOW(), NOW())
+      ON DUPLICATE KEY UPDATE
+          usage_count = usage_count + 1,
+          updated_at  = NOW()
+    ");
+    $u->bind_param("i", $employeeId);
+    $u->execute();
+    $u->close();
+  }
+
+  // ============================================================
   // 3. PERSONAL FLOW
   // ============================================================
   if ($row["type"] === "personal") {
 
-    // =========================
+    // ----------------------------------------------------------
     // CASE 1: PENDING
-    // =========================
+    // ----------------------------------------------------------
     if ($row["status"] === "PENDING") {
 
-      // 🔥 IF MANAGER IS GM → DIRECT APPROVAL
+      // ── GM is the direct manager → approve immediately ──────
       if ($isGM) {
 
         $tripCode = makeTripCode($employeeName);
 
         $stmt2 = $conn->prepare("
           UPDATE transport_services
-          SET status = 'APPROVED',
+          SET status    = 'APPROVED',
               trip_code = ?,
               updated_at = NOW()
           WHERE id = ?
@@ -129,17 +146,20 @@ try {
         }
         $stmt2->close();
 
+        // ✅ Record usage — GM direct approval
+        recordUsage($conn, $empId);
+
         respond(true, "Approved by General Manager", [
           "trip_code" => $tripCode
         ]);
       }
 
-      // 🔹 NORMAL HOD FLOW
+      // ── Normal HOD forward (no usage record yet) ─────────────
       $stmt2 = $conn->prepare("
         UPDATE transport_services
-        SET status = 'HOD_APPROVED',
+        SET status      = 'HOD_APPROVED',
             hod_comment = ?,
-            updated_at = NOW()
+            updated_at  = NOW()
         WHERE id = ?
           AND status = 'PENDING'
           AND deleted_at IS NULL
@@ -156,16 +176,16 @@ try {
       respond(true, "Request forwarded to General Manager");
     }
 
-    // =========================
-    // CASE 2: GM FINAL APPROVAL
-    // =========================
+    // ----------------------------------------------------------
+    // CASE 2: HOD_APPROVED → GM gives final approval
+    // ----------------------------------------------------------
     else if ($row["status"] === "HOD_APPROVED") {
 
       $tripCode = makeTripCode($employeeName);
 
       $stmt2 = $conn->prepare("
         UPDATE transport_services
-        SET status = 'APPROVED',
+        SET status    = 'APPROVED',
             trip_code = ?,
             updated_at = NOW()
         WHERE id = ?
@@ -181,6 +201,9 @@ try {
       }
       $stmt2->close();
 
+      // ✅ Record usage — GM final approval
+      recordUsage($conn, $empId);
+
       respond(true, "Request fully approved", [
         "trip_code" => $tripCode
       ]);
@@ -192,7 +215,7 @@ try {
   }
 
   // ============================================================
-  // 4. NON-PERSONAL FLOW
+  // 4. NON-PERSONAL FLOW (office / transfer)
   // ============================================================
   else {
 
@@ -204,7 +227,7 @@ try {
 
     $stmt2 = $conn->prepare("
       UPDATE transport_services
-      SET status = 'APPROVED',
+      SET status    = 'APPROVED',
           trip_code = ?,
           updated_at = NOW()
       WHERE id = ?

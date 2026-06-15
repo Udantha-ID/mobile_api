@@ -19,8 +19,8 @@ try {
   }
 
   // MUST match your Apache public folder
-  //$baseUploadsUrl = "https://exploresuite.lk/storage/employees/";
-  $baseUploadsUrl = "http://10.0.2.2/mobile-api/uploads/";
+  $baseUploadsUrl = "https://exploresuite.lk/storage/";
+  //$baseUploadsUrl = "http://10.0.2.2/mobile-api/uploads/";
 
   $sql = "
     SELECT file_name, file_path, mime_type, file_size_bytes, uploaded_at

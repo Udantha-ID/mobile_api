@@ -2,6 +2,7 @@
 header("Content-Type: application/json; charset=UTF-8");
 require_once __DIR__ . "/../assets/includes/db_connect.php";
 
+
 ini_set("display_errors", 0);
 error_reporting(E_ALL);
 
@@ -32,7 +33,7 @@ try {
   $stmt2 = $conn->prepare("
     SELECT job_title_id, name
     FROM job_titles
-    WHERE name IN ('Managing Director', 'General Manager')
+    WHERE name IN ('Managing Director', 'Group General Manager')
   ");
   $stmt2->execute();
   $res2 = $stmt2->get_result();
