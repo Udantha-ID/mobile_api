@@ -83,7 +83,6 @@ try {
   $st->close();
 
   if ($cnt > 0) {
-    http_response_code(409);
     respond(false, "You already have a leave for these dates. Please select another date range.");
   }
 
@@ -140,12 +139,10 @@ try {
 
     // 3) Validate
     if ($remaining <= 0) {
-      http_response_code(409);
       respond(false, "You don't have available $leaveTypeName Balance");
     }
 
     if ($days > $remaining) {
-      http_response_code(409);
       respond(false, "Not enough $leaveTypeName balance. Remaining: {$remaining} day(s).");
     }
   }
@@ -184,6 +181,48 @@ try {
   $stmt->execute();
   $leaveRequestId = (int)$conn->insert_id;
   $stmt->close();
+
+    // ---------- 4) PUSH NOTIFICATION TO RELIEVER (non-blocking) ----------
+  if ($overseeMemberIdDb !== null) {
+    try {
+      // Get reliever's FCM token
+      $st = $conn->prepare("SELECT fcm_token FROM employees WHERE employee_id = ? LIMIT 1");
+      $st->bind_param("s", $overseeMemberIdDb);
+      $st->execute();
+      $tokenRow = $st->get_result()->fetch_assoc();
+      $st->close();
+
+      $fcmToken = $tokenRow["fcm_token"] ?? null;
+
+      if (!empty($fcmToken)) {
+        // Get applicant's display name
+        $st2 = $conn->prepare("SELECT preferred_name, full_name FROM employees WHERE employee_id = ? LIMIT 1");
+        $st2->bind_param("i", $employeeId);
+        $st2->execute();
+        $nameRow = $st2->get_result()->fetch_assoc();
+        $st2->close();
+
+        $applicantName = trim((string)($nameRow["preferred_name"] ?? ""));
+        if ($applicantName === "") $applicantName = trim((string)($nameRow["full_name"] ?? ""));
+        if ($applicantName === "") $applicantName = "An employee";
+
+        require_once __DIR__ . "/../notifications/fcm_helper.php";
+
+        FcmHelper::send(
+          $fcmToken,
+          "New Reliever Request",
+          "$applicantName has requested you as a reliever for $leaveTypeName ($startDate to $endDate).",
+          [
+            "type" => "reliever_request",
+            "leaveRequestId" => $leaveRequestId,
+          ]
+        );
+      }
+    } catch (Throwable $notifyError) {
+      // Never let a notification failure break the leave request itself
+      error_log("FCM send failed: " . $notifyError->getMessage());
+    }
+  }
 
   // Done
   respond(true, "Leave request submitted", [

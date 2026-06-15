@@ -1,7 +1,7 @@
 <?php
 class FcmHelper {
     private static $serviceAccountPath = __DIR__ . "/../secure/firebase-service-account.json";
-    private static $projectId = "YOUR_FIREBASE_PROJECT_ID"; // from Firebase console
+    private static $projectId = "explore-push-notify";
 
     private static function base64UrlEncode($data) {
         return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
