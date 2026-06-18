@@ -17,22 +17,22 @@ if ($leave_request_id === '' || $manager_id === '') {
 try {
   $conn->begin_transaction();
 
-  // 1) Get leave request + security check
+  // NEW — works with assigned manager_id OR reporting manager as fallback
   $q = "
-    SELECT
-      lr.leave_request_id,
-      lr.employee_id,
-      lr.leave_policy_id,
-      lr.number_of_days,
-      lr.status
+    SELECT lr.leave_request_id, lr.employee_id, lr.leave_policy_id, lr.number_of_days,
+          lr.status, lr.manager_id AS assigned_manager_id,
+          ej.reporting_manager_id
     FROM leave_requests lr
     JOIN employee_job ej ON ej.employee_id = lr.employee_id
     WHERE lr.leave_request_id = ?
-      AND ej.reporting_manager_id = ?
+      AND (
+        lr.manager_id = ?
+        OR (lr.manager_id IS NULL AND ej.reporting_manager_id = ?)
+      )
     FOR UPDATE
   ";
   $stmt = $conn->prepare($q);
-  $stmt->bind_param("is", $leave_request_id, $manager_id);
+  $stmt->bind_param("iss", $leave_request_id, $manager_id, $manager_id);
   $stmt->execute();
   $res = $stmt->get_result();
 
@@ -162,6 +162,41 @@ try {
   $stmt4->execute();
 
   $conn->commit();
+
+  // ---------- NOTIFY EMPLOYEE: LEAVE APPROVED (non-blocking) ----------
+  try {
+    require_once __DIR__ . "/../notifications/fcm_helper.php";
+
+    $stN = $conn->prepare("
+      SELECT lr.leave_start_date, lr.leave_end_date, lp.name AS leave_type_name,
+             e.fcm_token
+      FROM leave_requests lr
+      JOIN leave_policies lp ON lp.leave_policy_id = lr.leave_policy_id
+      JOIN employees e ON e.employee_id = lr.employee_id
+      WHERE lr.leave_request_id = ?
+      LIMIT 1
+    ");
+    $stN->bind_param("i", $leave_request_id);
+    $stN->execute();
+    $notifyRow = $stN->get_result()->fetch_assoc();
+    $stN->close();
+
+    if (!empty($notifyRow["fcm_token"])) {
+      $leaveTypeName = $notifyRow["leave_type_name"] ?? "Leave";
+      $from = $notifyRow["leave_start_date"];
+      $to   = $notifyRow["leave_end_date"];
+
+      FcmHelper::send(
+        $notifyRow["fcm_token"],
+        "Leave Request Approved",
+        "Your $leaveTypeName request ($from to $to) has been approved.",
+        ["type" => "leave_approved", "leaveRequestId" => (string)$leave_request_id]
+      );
+    }
+  } catch (Throwable $notifyError) {
+    error_log("FCM notify (approve_leave) failed: " . $notifyError->getMessage());
+  }
+
   echo json_encode(["success" => true, "message" => "Approved + Leave balance updated"]);
 
 } catch (Throwable $e) {

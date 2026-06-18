@@ -39,6 +39,7 @@ if (($_SERVER["REQUEST_METHOD"] ?? "") !== "POST") {
 $transport_service_id = trim($_POST["transport_service_id"] ?? "");
 $odometer = trim($_POST["odometer"] ?? "");
 $fuel = trim($_POST["fuel_percent"] ?? "");
+$remark = trim($_POST["start_remark"] ?? "") ?: null;
 
 writeLog("Raw inputs - transport_service_id: {$transport_service_id}, odometer: {$odometer}, fuel_percent: {$fuel}");
 
@@ -143,18 +144,18 @@ try {
             trip_start_odometer,
             trip_start_odometer_photo,
             start_trip_fuel,
+            start_remark,               -- ← new
             created_at,
             updated_at
         )
-        VALUES
-        (?, NOW(), ?, ?, ?, NOW(), NOW())
+        VALUES (?, NOW(), ?, ?, ?, ?, NOW(), NOW())
     ");
 
     if (!$ins) {
         throw new Exception("Prepare failed for trip_details insert: " . $conn->error);
     }
 
-    $ins->bind_param("iisd", $transport_service_id, $odometer, $dbPhotoPath, $fuel);
+    $ins->bind_param("iisds", $transport_service_id, $odometer, $dbPhotoPath, $fuel, $remark);
     $ins->execute();
     $trip_detail_id = $ins->insert_id;
     $ins->close();

@@ -39,6 +39,7 @@ try {
   $isSpecial       = (int)($data["isSpecialRequest"] ?? 0);
   $address         = trim((string)($data["address"] ?? ""));
   $halfDaySession  = strtoupper(trim((string)($data["halfDaySession"] ?? ""))); // MORNING/EVENING or ""
+  $managerId = (int)($data["managerId"] ?? 0);
 
   // Required
   if ($employeeId <= 0 || $leavePolicyId <= 0 || $startDate === "" || $reason === "") {
@@ -154,48 +155,46 @@ try {
   $sqlIns = "
     INSERT INTO leave_requests
       (employee_id, leave_policy_id, leave_start_date, leave_end_date, number_of_days,
-       half_day_session,
-       reason, oversee_member_id, is_special_request, address, status, requested_at, updated_at)
+      half_day_session, reason, oversee_member_id, manager_id,
+      is_special_request, address, status, requested_at, updated_at)
     VALUES
       (?, ?, ?, ?, ?,
-       ?,
-       ?, ?, ?, ?, 'PENDING', NOW(), NOW())
+      ?, ?, ?, ?,
+      ?, ?, 'PENDING', NOW(), NOW())
   ";
 
   $stmt = $conn->prepare($sqlIns);
-
   $stmt->bind_param(
-    "iissdsssis",
-    $employeeId,        // i
-    $leavePolicyId,     // i
-    $startDate,         // s
-    $endDate,           // s
-    $days,              // d
-    $halfDaySession,    // s (can be NULL)
-    $reason,            // s
-    $overseeMemberIdDb, // s (can be NULL)
-    $isSpecial,         // i
-    $address            // s
+      "iissdsssiis",   // ← 11 chars: i,i,s,s,d,s,s,s,i,i,s
+      $employeeId,     // i
+      $leavePolicyId,  // i
+      $startDate,      // s
+      $endDate,        // s
+      $days,           // d
+      $halfDaySession, // s
+      $reason,         // s
+      $overseeMemberIdDb, // s
+      $managerId,      // i
+      $isSpecial,      // i
+      $address         // s
   );
-
   $stmt->execute();
   $leaveRequestId = (int)$conn->insert_id;
   $stmt->close();
 
-    // ---------- 4) PUSH NOTIFICATION TO RELIEVER (non-blocking) ----------
+  // After INSERT succeeds...
+
+  // Notify reliever (existing)
   if ($overseeMemberIdDb !== null) {
     try {
-      // Get reliever's FCM token
       $st = $conn->prepare("SELECT fcm_token FROM employees WHERE employee_id = ? LIMIT 1");
       $st->bind_param("s", $overseeMemberIdDb);
       $st->execute();
       $tokenRow = $st->get_result()->fetch_assoc();
       $st->close();
-
       $fcmToken = $tokenRow["fcm_token"] ?? null;
 
       if (!empty($fcmToken)) {
-        // Get applicant's display name
         $st2 = $conn->prepare("SELECT preferred_name, full_name FROM employees WHERE employee_id = ? LIMIT 1");
         $st2->bind_param("i", $employeeId);
         $st2->execute();
@@ -212,15 +211,47 @@ try {
           $fcmToken,
           "New Reliever Request",
           "$applicantName has requested you as a reliever for $leaveTypeName ($startDate to $endDate).",
-          [
-            "type" => "reliever_request",
-            "leaveRequestId" => $leaveRequestId,
-          ]
+          ["type" => "reliever_request", "leaveRequestId" => $leaveRequestId]
         );
       }
-    } catch (Throwable $notifyError) {
-      // Never let a notification failure break the leave request itself
-      error_log("FCM send failed: " . $notifyError->getMessage());
+    } catch (Throwable $n) {
+      error_log("FCM reliever notify failed: " . $n->getMessage());
+    }
+  }
+
+  // Notify the assigned manager (NEW)
+  if ($managerId > 0) {
+    try {
+      require_once __DIR__ . "/../notifications/fcm_helper.php";
+
+      // Get applicant name if not already fetched
+      if (!isset($applicantName)) {
+        $st = $conn->prepare("SELECT preferred_name, full_name FROM employees WHERE employee_id = ? LIMIT 1");
+        $st->bind_param("i", $employeeId);
+        $st->execute();
+        $nameRow = $st->get_result()->fetch_assoc();
+        $st->close();
+        $applicantName = trim((string)($nameRow["preferred_name"] ?? ""));
+        if ($applicantName === "") $applicantName = trim((string)($nameRow["full_name"] ?? ""));
+        if ($applicantName === "") $applicantName = "An employee";
+      }
+
+      $stMgr = $conn->prepare("SELECT fcm_token FROM employees WHERE employee_id = ? LIMIT 1");
+      $stMgr->bind_param("i", $managerId);
+      $stMgr->execute();
+      $mgrToken = $stMgr->get_result()->fetch_assoc()["fcm_token"] ?? null;
+      $stMgr->close();
+
+      if (!empty($mgrToken)) {
+        FcmHelper::send(
+          $mgrToken,
+          "New Leave Request",
+          "$applicantName has submitted a $leaveTypeName request ($startDate to $endDate).",
+          ["type" => "manager_leave_approval", "leaveRequestId" => $leaveRequestId]
+        );
+      }
+    } catch (Throwable $n) {
+      error_log("FCM manager notify failed: " . $n->getMessage());
     }
   }
 

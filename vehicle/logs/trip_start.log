@@ -1,0 +1,81 @@
+[2026-06-17 12:57:50] Request received for trip start API
+[2026-06-17 12:57:50] Raw inputs - transport_service_id: 119, odometer: 1000, fuel_percent: 50.0
+[2026-06-17 12:57:50] Starting DB transaction for transport_service_id: 119
+[2026-06-17 12:57:50] Trip found. Current status: APPROVED
+[2026-06-17 12:57:50] Uploaded file detected: scaled_1000000037.jpg, extension: jpg
+[2026-06-17 12:57:50] Photo saved successfully: uploads/trips/start_119_1781693870.jpg
+[2026-06-17 12:57:50] trip_details inserted successfully. trip_detail_id: 10
+[2026-06-17 12:57:50] transport_services updated to IN_PROGRESS for ID: 119
+[2026-06-17 12:57:50] Transaction committed successfully for transport_service_id: 119
+[2026-06-17 13:11:56] Request received for trip start API
+[2026-06-17 13:11:56] Raw inputs - transport_service_id: 119, odometer: 1000, fuel_percent: 50.0
+[2026-06-17 13:11:56] Starting DB transaction for transport_service_id: 119
+[2026-06-17 13:11:56] Trip found. Current status: APPROVED
+[2026-06-17 13:11:56] Uploaded file detected: scaled_1000000037.jpg, extension: jpg
+[2026-06-17 13:11:56] Photo saved successfully: uploads/trips/start_119_1781694716.jpg
+[2026-06-17 13:11:56] trip_details inserted successfully. trip_detail_id: 11
+[2026-06-17 13:11:56] transport_services updated to IN_PROGRESS for ID: 119
+[2026-06-17 13:11:56] Transaction committed successfully for transport_service_id: 119
+[2026-06-17 14:05:21] Request received for trip start API
+[2026-06-17 14:05:21] Raw inputs - transport_service_id: 119, odometer: 1000, fuel_percent: 50.0
+[2026-06-17 14:05:21] Starting DB transaction for transport_service_id: 119
+[2026-06-17 14:05:21] Trip found. Current status: APPROVED
+[2026-06-17 14:05:21] Uploaded file detected: scaled_1000000037.jpg, extension: jpg
+[2026-06-17 14:05:21] Photo saved successfully: uploads/trips/start_119_1781697921.jpg
+[2026-06-17 14:05:21] trip_details inserted successfully. trip_detail_id: 12
+[2026-06-17 14:05:21] transport_services updated to IN_PROGRESS for ID: 119
+[2026-06-17 14:05:21] Transaction committed successfully for transport_service_id: 119
+[2026-06-18 07:54:38] Request received for trip start API
+[2026-06-18 07:54:38] Raw inputs - transport_service_id: 119, odometer: 1000, fuel_percent: 50.0
+[2026-06-18 07:54:38] Starting DB transaction for transport_service_id: 119
+[2026-06-18 07:54:38] Trip found. Current status: APPROVED
+[2026-06-18 07:54:38] Uploaded file detected: scaled_1000000037.jpg, extension: jpg
+[2026-06-18 07:54:38] Photo saved successfully: uploads/trips/start_119_1781762078.jpg
+[2026-06-18 07:54:38] trip_details inserted successfully. trip_detail_id: 13
+[2026-06-18 07:54:38] transport_services updated to IN_PROGRESS for ID: 119
+[2026-06-18 07:54:38] Transaction committed successfully for transport_service_id: 119
+[2026-06-18 08:14:38] Request received for trip start API
+[2026-06-18 08:14:38] Raw inputs - transport_service_id: 119, odometer: 2000, fuel_percent: 50.0
+[2026-06-18 08:14:38] Starting DB transaction for transport_service_id: 119
+[2026-06-18 08:14:38] Trip found. Current status: APPROVED
+[2026-06-18 08:14:38] Uploaded file detected: scaled_1000000037.jpg, extension: jpg
+[2026-06-18 08:14:38] Photo saved successfully: uploads/trips/start_119_1781763278.jpg
+[2026-06-18 08:14:38] trip_details inserted successfully. trip_detail_id: 14
+[2026-06-18 08:14:38] transport_services updated to IN_PROGRESS for ID: 119
+[2026-06-18 08:14:38] Transaction committed successfully for transport_service_id: 119
+[2026-06-18 08:23:36] Request received for trip start API
+[2026-06-18 08:23:36] Raw inputs - transport_service_id: 119, odometer: 1000, fuel_percent: 50.0
+[2026-06-18 08:23:36] Starting DB transaction for transport_service_id: 119
+[2026-06-18 08:23:36] Trip found. Current status: APPROVED
+[2026-06-18 08:23:36] Uploaded file detected: scaled_1000000037.jpg, extension: jpg
+[2026-06-18 08:23:36] Photo saved successfully: uploads/trips/start_119_1781763816.jpg
+[2026-06-18 08:23:36] trip_details inserted successfully. trip_detail_id: 15
+[2026-06-18 08:23:36] transport_services updated to IN_PROGRESS for ID: 119
+[2026-06-18 08:23:36] Transaction committed successfully for transport_service_id: 119
+[2026-06-18 08:28:08] Request received for trip start API
+[2026-06-18 08:28:08] Raw inputs - transport_service_id: 119, odometer: 1000, fuel_percent: 75.0
+[2026-06-18 08:28:08] Starting DB transaction for transport_service_id: 119
+[2026-06-18 08:28:08] Trip found. Current status: APPROVED
+[2026-06-18 08:28:08] Uploaded file detected: scaled_1000000037.jpg, extension: jpg
+[2026-06-18 08:28:08] Photo saved successfully: uploads/trips/start_119_1781764088.jpg
+[2026-06-18 08:28:08] trip_details inserted successfully. trip_detail_id: 16
+[2026-06-18 08:28:08] transport_services updated to IN_PROGRESS for ID: 119
+[2026-06-18 08:28:08] Transaction committed successfully for transport_service_id: 119
+[2026-06-18 08:38:26] Request received for trip start API
+[2026-06-18 08:38:26] Raw inputs - transport_service_id: 120, odometer: 1000, fuel_percent: 75.0
+[2026-06-18 08:38:26] Starting DB transaction for transport_service_id: 120
+[2026-06-18 08:38:26] Trip found. Current status: APPROVED
+[2026-06-18 08:38:26] Uploaded file detected: scaled_1000000037.jpg, extension: jpg
+[2026-06-18 08:38:26] Photo saved successfully: uploads/trips/start_120_1781764706.jpg
+[2026-06-18 08:38:26] trip_details inserted successfully. trip_detail_id: 17
+[2026-06-18 08:38:26] transport_services updated to IN_PROGRESS for ID: 120
+[2026-06-18 08:38:26] Transaction committed successfully for transport_service_id: 120
+[2026-06-18 09:34:52] Request received for trip start API
+[2026-06-18 09:34:52] Raw inputs - transport_service_id: 119, odometer: 1000, fuel_percent: 50.0
+[2026-06-18 09:34:52] Starting DB transaction for transport_service_id: 119
+[2026-06-18 09:34:52] Trip found. Current status: APPROVED
+[2026-06-18 09:34:52] Uploaded file detected: scaled_1000000037.jpg, extension: jpg
+[2026-06-18 09:34:52] Photo saved successfully: uploads/trips/start_119_1781768092.jpg
+[2026-06-18 09:34:52] trip_details inserted successfully. trip_detail_id: 18
+[2026-06-18 09:34:52] transport_services updated to IN_PROGRESS for ID: 119
+[2026-06-18 09:34:52] Transaction committed successfully for transport_service_id: 119

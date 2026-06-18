@@ -25,10 +25,15 @@ try {
     if ($manager_id <= 0) { http_response_code(422); ob_clean(); echo json_encode(["success" => false, "message" => "manager_id is required"]); exit; }
 
     // Verify request belongs to manager and is PENDING
+    // Also fetch employee_id and dates for the notification
     $check = $conn->prepare("
-        SELECT id, employee_name
-        FROM gate_pass_requests
-        WHERE id = ? AND manager_id = ? AND status = 'PENDING' AND deleted_at IS NULL
+        SELECT gp.id, gp.employee_id, gp.employee_name,
+               gp.gate_pass_date, gp.out_time, gp.return_time
+        FROM gate_pass_requests gp
+        WHERE gp.id = ?
+          AND gp.manager_id = ?
+          AND gp.status = 'PENDING'
+          AND gp.deleted_at IS NULL
     ");
     $check->bind_param("ii", $id, $manager_id);
     $check->execute();
@@ -65,6 +70,40 @@ try {
     $stmt->bind_param("si", $gate_pass_code, $id);
     $stmt->execute();
     $stmt->close();
+
+    // ── NOTIFY APPLICANT: GATE PASS APPROVED (non-blocking) ──────────────
+    try {
+        require_once __DIR__ . "/../notifications/fcm_helper.php";
+
+        $applicantId  = (int)$row["employee_id"];
+        $dateDisplay  = $row["gate_pass_date"];
+        $outTime      = $row["out_time"];
+        $returnTime   = $row["return_time"];
+
+        // Get applicant's FCM token
+        $stToken = $conn->prepare(
+            "SELECT fcm_token FROM employees WHERE employee_id = ? LIMIT 1"
+        );
+        $stToken->bind_param("i", $applicantId);
+        $stToken->execute();
+        $tokenRow = $stToken->get_result()->fetch_assoc();
+        $stToken->close();
+
+        if (!empty($tokenRow["fcm_token"])) {
+            FcmHelper::send(
+                $tokenRow["fcm_token"],
+                "Gate Pass Approved ✓",
+                "Your gate pass for $dateDisplay ($outTime – $returnTime) has been approved. Your pass code is $gate_pass_code.",
+                [
+                    "type"          => "gate_pass_approved",
+                    "gatePassId"    => (string)$id,
+                    "gatePassCode"  => $gate_pass_code,
+                ]
+            );
+        }
+    } catch (Throwable $notifyError) {
+        error_log("FCM notify (gate_pass_approve) failed: " . $notifyError->getMessage());
+    }
 
     ob_clean();
     echo json_encode([

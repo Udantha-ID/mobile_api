@@ -26,6 +26,8 @@ try {
             ts.status,
             ts.vehicle_no,
             ts.trip_code,
+            ts.change_vehicle_trip_code,       -- ← new
+            ts.change_vehicle_destination,     -- ← new
             ts.dropoff_location,
             ts.pickup_location,
             ts.type,
@@ -35,17 +37,18 @@ try {
             ts.chauffer_name,
             ts.chauffer_phone,
             ts.companion_employee_ids,
+            ts.created_at,
             COALESCE(m.preferred_name, '') AS manager_name,
             td.trip_start_odometer,
             td.trip_end_odometer,
-            CASE
-                WHEN td.trip_end_odometer IS NOT NULL AND td.trip_start_odometer IS NOT NULL
-                THEN (td.trip_end_odometer - td.trip_start_odometer)
-                ELSE NULL
-            END AS distance_km
+            td.end_trip_fuel,
+            td.change_vehicle_no,
+            td.change_vehicle_start_odometer,
+            td.change_vehicle_start_fuel,
+            td.change_vehicle_end_odometer,
+            td.change_vehicle_remark
         FROM transport_services ts
-        LEFT JOIN employees m
-            ON m.employee_id = ts.manager_id
+        LEFT JOIN employees m ON m.employee_id = ts.manager_id
         LEFT JOIN trip_details td
             ON td.trip_detail_id = (
                 SELECT t2.trip_detail_id
@@ -55,8 +58,8 @@ try {
                 LIMIT 1
             )
         WHERE ts.employee_id = ?
-          AND ts.type        = 'office'
-          AND ts.deleted_at  IS NULL
+        AND ts.type        = 'office'
+        AND ts.deleted_at  IS NULL
         ORDER BY ts.created_at DESC
     ");
 
@@ -96,27 +99,74 @@ try {
             }
         }
 
+        // Determine if this trip had a vehicle change
+        $status         = (string)($r["status"] ?? "");
+        $isVehicleChanging = strtoupper($status) === "VEHICLE_CHANGING";
+        $changeVehicleNo   = (string)($r["change_vehicle_no"] ?? "");
+        $isChanged         = $changeVehicleNo !== "";
+
+        // For changed-vehicle trips, the FINAL end meter is in change_vehicle_end_odometer.
+        // For normal trips, it's in trip_end_odometer.
+        $tripEndOdometer = $isChanged && $r["change_vehicle_end_odometer"] !== null
+            ? (int)$r["change_vehicle_end_odometer"]
+            : ($r["trip_end_odometer"] !== null ? (int)$r["trip_end_odometer"] : null);
+
+        // Vehicle A's end meter — present during VEHICLE_CHANGING and COMPLETED-with-change
+        $oldVehicleEndMeter = ($isVehicleChanging || $isChanged) && $r["trip_end_odometer"] !== null
+            ? (int)$r["trip_end_odometer"] : null;
+        $oldVehicleEndFuel  = ($isVehicleChanging || $isChanged) && $r["end_trip_fuel"] !== null
+            ? (float)$r["end_trip_fuel"] : null;
+
+        // Total distance calculation
+        if ($isChanged
+            && $r["trip_end_odometer"]               !== null
+            && $r["change_vehicle_start_odometer"]   !== null
+            && $r["change_vehicle_end_odometer"]     !== null) {
+            $seg1       = max(0, (int)$r["trip_end_odometer"] - (int)($r["trip_start_odometer"] ?? 0));
+            $seg2       = max(0, (int)$r["change_vehicle_end_odometer"] - (int)$r["change_vehicle_start_odometer"]);
+            $distanceKm = $seg1 + $seg2;
+        } elseif (!$isChanged && $r["trip_end_odometer"] !== null && $r["trip_start_odometer"] !== null) {
+            $distanceKm = max(0, (int)$r["trip_end_odometer"] - (int)$r["trip_start_odometer"]);
+        } else {
+            $distanceKm = null;
+        }
+
         $rows[] = [
             "id"             => (int)    $r["id"],
-            "status"         => (string) $r["status"],
+            "status"         => $status,
             "vehicleNo"      => (string)($r["vehicle_no"]       ?? ""),
             "vehicleName"    => "",
             "tripCode"       => (string)($r["trip_code"]        ?? ""),
             "destination"    => (string)($r["dropoff_location"] ?? ""),
             "pickupLocation" => (string)($r["pickup_location"]  ?? ""),
             "reason"         => (string)($r["type"]             ?? ""),
+            "created_at"     => $r["created_at"] ?? "",
             "approvedById"   => (int)   ($r["manager_id"]       ?? 0),
             "approvedByName" => (string)($r["manager_name"]     ?? ""),
             "fromDate"       => $r["assigned_start_at"]
                 ? date("m/d/Y", strtotime($r["assigned_start_at"])) : "",
             "toDate"         => $r["assigned_end_at"]
-                ? date("m/d/Y", strtotime($r["assigned_end_at"]))   : "",
+                ? date("m/d/Y", strtotime($r["assigned_end_at"])) : "",
             "chaufferName"   => (string)($r["chauffer_name"]    ?? ""),
             "chaufferPhone"  => (string)($r["chauffer_phone"]   ?? ""),
             "companions"     => $companions,
-            "tripStartOdometer" => $r["trip_start_odometer"] !== null ? (float)$r["trip_start_odometer"] : null,
-            "tripEndOdometer"   => $r["trip_end_odometer"]   !== null ? (float)$r["trip_end_odometer"]   : null,
-            "distanceKm"        => $r["distance_km"]         !== null ? (float)$r["distance_km"]         : null,
+
+            // Odometer / fuel fields
+            "startMeter"            => $r["trip_start_odometer"] !== null ? (int)$r["trip_start_odometer"]   : null,
+            "tripStartOdometer"     => $r["trip_start_odometer"] !== null ? (float)$r["trip_start_odometer"] : null,
+            "tripEndOdometer"       => $tripEndOdometer,
+            "distanceKm"            => $distanceKm,
+
+            // Vehicle-change fields
+            "changeVehicleNo"         => $changeVehicleNo,
+            "oldVehicleEndMeter"      => $oldVehicleEndMeter,
+            "oldVehicleEndFuel"       => $oldVehicleEndFuel,
+            "changeVehicleStartMeter" => $r["change_vehicle_start_odometer"] !== null ? (int)$r["change_vehicle_start_odometer"] : null,
+            "changeVehicleEndMeter"   => $r["change_vehicle_end_odometer"]   !== null ? (int)$r["change_vehicle_end_odometer"]   : null,
+            "changeVehicleRemark"     => (string)($r["change_vehicle_remark"] ?? ""),
+
+            "changeVehicleTripCode"    => (string)($r["change_vehicle_trip_code"]   ?? ""),
+            "changeVehicleDestination" => (string)($r["change_vehicle_destination"] ?? ""),
         ];
     }
 

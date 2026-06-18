@@ -27,8 +27,10 @@ try {
     if ($reject_reason === "") { http_response_code(422); ob_clean(); echo json_encode(["success" => false, "message" => "reject_reason is required"]); exit; }
 
     // Verify request belongs to manager and is PENDING
+    // Also fetch employee_id and dates needed for the notification
     $check = $conn->prepare("
-        SELECT id FROM gate_pass_requests
+        SELECT id, employee_id, gate_pass_date, out_time, return_time
+        FROM gate_pass_requests
         WHERE id = ? AND manager_id = ? AND status = 'PENDING' AND deleted_at IS NULL
     ");
     $check->bind_param("ii", $id, $manager_id);
@@ -52,6 +54,38 @@ try {
     $stmt->bind_param("si", $reject_reason, $id);
     $stmt->execute();
     $stmt->close();
+
+    // ── NOTIFY APPLICANT: GATE PASS REJECTED (non-blocking) ──────────────
+    try {
+        require_once __DIR__ . "/../notifications/fcm_helper.php";
+
+        $applicantId = (int)$row["employee_id"];
+        $dateDisplay = $row["gate_pass_date"];
+        $outTime     = $row["out_time"];
+        $returnTime  = $row["return_time"];
+
+        $stToken = $conn->prepare(
+            "SELECT fcm_token FROM employees WHERE employee_id = ? LIMIT 1"
+        );
+        $stToken->bind_param("i", $applicantId);
+        $stToken->execute();
+        $tokenRow = $stToken->get_result()->fetch_assoc();
+        $stToken->close();
+
+        if (!empty($tokenRow["fcm_token"])) {
+            FcmHelper::send(
+                $tokenRow["fcm_token"],
+                "Gate Pass Rejected",
+                "Your gate pass for $dateDisplay ($outTime – $returnTime) was rejected.",
+                [
+                    "type"       => "gate_pass_rejected",
+                    "gatePassId" => (string)$id,
+                ]
+            );
+        }
+    } catch (Throwable $notifyError) {
+        error_log("FCM notify (gate_pass_reject) failed: " . $notifyError->getMessage());
+    }
 
     ob_clean();
     echo json_encode([

@@ -32,5 +32,40 @@ $sql = "UPDATE leave_requests SET status='REJECTED', manager_comment=?, updated_
 $stmt2 = $conn->prepare($sql);
 $stmt2->bind_param("si", $comment, $leave_request_id);
 $stmt2->execute();
+$stmt2->close();
+
+// ---------- NOTIFY EMPLOYEE: LEAVE REJECTED (non-blocking) ----------
+try {
+  require_once __DIR__ . "/../notifications/fcm_helper.php";
+
+  $stN = $conn->prepare("
+    SELECT lr.leave_start_date, lr.leave_end_date, lp.name AS leave_type_name,
+           e.fcm_token
+    FROM leave_requests lr
+    JOIN leave_policies lp ON lp.leave_policy_id = lr.leave_policy_id
+    JOIN employees e ON e.employee_id = lr.employee_id
+    WHERE lr.leave_request_id = ?
+    LIMIT 1
+  ");
+  $stN->bind_param("i", $leave_request_id);
+  $stN->execute();
+  $notifyRow = $stN->get_result()->fetch_assoc();
+  $stN->close();
+
+  if (!empty($notifyRow["fcm_token"])) {
+    $leaveTypeName = $notifyRow["leave_type_name"] ?? "Leave";
+    $from = $notifyRow["leave_start_date"];
+    $to   = $notifyRow["leave_end_date"];
+
+    FcmHelper::send(
+      $notifyRow["fcm_token"],
+      "Leave Request Rejected",
+      "Your $leaveTypeName request ($from to $to) was rejected.",
+      ["type" => "leave_rejected", "leaveRequestId" => (string)$leave_request_id]
+    );
+  }
+} catch (Throwable $notifyError) {
+  error_log("FCM notify (reject_leave) failed: " . $notifyError->getMessage());
+}
 
 echo json_encode(["success" => true, "message" => "Rejected"]);

@@ -48,7 +48,9 @@ try {
       ts.assigned_end_at,
       ts.trip_code,
       ts.hod_comment,
-	  ts.reject_reason,
+	   ts.reject_reason,
+     ts.created_at,
+
 
       td.trip_start_datetime,
       td.trip_end_datetime,

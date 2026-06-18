@@ -34,11 +34,15 @@ try {
     $vehicle_no = (isset($body["vehicle_no"]) && $body["vehicle_no"] !== "")
         ? trim($body["vehicle_no"]) : null;
 
-    $companion_employee_ids = (
+    // Keep the raw array for notifications, encode for DB storage
+    $companionIds = (
         isset($body["companion_employee_ids"]) &&
         is_array($body["companion_employee_ids"]) &&
         count($body["companion_employee_ids"]) > 0
-    ) ? json_encode($body["companion_employee_ids"]) : null;
+    ) ? $body["companion_employee_ids"] : [];
+
+    $companion_employee_ids = count($companionIds) > 0
+        ? json_encode($companionIds) : null;
 
     $remark = (isset($body["remark"]) && $body["remark"] !== "")
         ? trim($body["remark"]) : null;
@@ -69,19 +73,6 @@ try {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')";
 
     $stmt = $conn->prepare($sql);
-
-    // Type string — exactly 12 chars, no spaces:
-    // i  = employee_id      (int)
-    // s  = employee_name    (string)
-    // s  = contact_no       (string)
-    // i  = manager_id       (int)
-    // s  = gate_pass_date   (string)
-    // s  = out_time         (string)
-    // s  = return_time      (string)
-    // s  = reason           (string)
-    // s  = vehicle_no       (string|null)
-    // s  = companion_ids    (string|null)
-    // s  = remark           (string|null)
     $stmt->bind_param("ississsssss",
         $employee_id,
         $employee_name,
@@ -97,8 +88,74 @@ try {
     );
 
     $stmt->execute();
-    $new_id = $conn->insert_id;
+    $new_id = (int)$conn->insert_id;
     $stmt->close();
+
+    // ── PUSH NOTIFICATIONS (non-blocking) ─────────────────────────────────
+    try {
+        require_once __DIR__ . "/../notifications/fcm_helper.php";
+
+        $gatePassId  = (string)$new_id;
+        $dateDisplay = $gate_pass_date; // e.g. "2026-06-20"
+
+        // 1) Notify the manager ────────────────────────────────────────────
+        $stMgr = $conn->prepare(
+            "SELECT fcm_token FROM employees WHERE employee_id = ? LIMIT 1"
+        );
+        $stMgr->bind_param("i", $manager_id);
+        $stMgr->execute();
+        $mgrRow = $stMgr->get_result()->fetch_assoc();
+        $stMgr->close();
+
+        if (!empty($mgrRow["fcm_token"])) {
+            FcmHelper::send(
+                $mgrRow["fcm_token"],
+                "New Gate Pass Request",
+                "$employee_name has submitted a gate pass request for $dateDisplay ($out_time – $return_time). Please review and approve.",
+                [
+                    "type"        => "gate_pass_approval",
+                    "gatePassId"  => $gatePassId,
+                ]
+            );
+        }
+
+        // 2) Notify each companion employee ───────────────────────────────
+        if (count($companionIds) > 0) {
+            // Build a safe IN clause with one ? per companion ID
+            $placeholders = implode(",", array_fill(0, count($companionIds), "?"));
+            $types        = str_repeat("i", count($companionIds));
+
+            $stComp = $conn->prepare(
+                "SELECT fcm_token FROM employees
+                 WHERE employee_id IN ($placeholders)
+                   AND fcm_token IS NOT NULL"
+            );
+
+            // bind_param needs variables passed by reference, so spread the array
+            $stComp->bind_param($types, ...$companionIds);
+            $stComp->execute();
+            $compResult = $stComp->get_result();
+            $stComp->close();
+
+            while ($compRow = $compResult->fetch_assoc()) {
+                if (!empty($compRow["fcm_token"])) {
+                    FcmHelper::send(
+                        $compRow["fcm_token"],
+                        "Gate Pass Request",
+                        "$employee_name has included you in a gate pass request for $dateDisplay ($out_time – $return_time).",
+                        [
+                            "type"       => "gate_pass_companion",
+                            "gatePassId" => $gatePassId,
+                        ]
+                    );
+                }
+            }
+        }
+
+    } catch (Throwable $notifyError) {
+        // Never let a notification failure break the gate pass submission
+        error_log("FCM notify (gate_pass) failed: " . $notifyError->getMessage());
+    }
 
     ob_clean();
     echo json_encode([
@@ -109,7 +166,6 @@ try {
     exit;
 
 } catch (Throwable $e) {
-
     http_response_code(500);
     ob_clean();
     echo json_encode([
