@@ -79,3 +79,12 @@
 [2026-06-18 09:34:52] trip_details inserted successfully. trip_detail_id: 18
 [2026-06-18 09:34:52] transport_services updated to IN_PROGRESS for ID: 119
 [2026-06-18 09:34:52] Transaction committed successfully for transport_service_id: 119
+[2026-06-19 11:30:19] Request received for trip start API
+[2026-06-19 11:30:19] Raw inputs - transport_service_id: 121, odometer: 1000, fuel_percent: 50.0
+[2026-06-19 11:30:19] Starting DB transaction for transport_service_id: 121
+[2026-06-19 11:30:19] Trip found. Current status: APPROVED
+[2026-06-19 11:30:19] Uploaded file detected: scaled_1000000037.jpg, extension: jpg
+[2026-06-19 11:30:19] Photo saved successfully: uploads/trips/start_121_1781861419.jpg
+[2026-06-19 11:30:19] trip_details inserted successfully. trip_detail_id: 19
+[2026-06-19 11:30:19] transport_services updated to IN_PROGRESS for ID: 121
+[2026-06-19 11:30:19] Transaction committed successfully for transport_service_id: 121

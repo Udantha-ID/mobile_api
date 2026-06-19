@@ -1,0 +1,106 @@
+[2026-06-19 11:28:54] Incoming request
+Array
+(
+    [raw] => {"contact_no":"0763904365","employee_id":"26","manager_id":"14","vehicle_no":"CAD-7412","from_date":"2026-06-19","to_date":"2026-06-19","chauffer_phone":"0763904365","chauffer_name":"Induru Udantha","reason":"Personal Request","vehicle_type":"Car","vehicle_id":106,"remark":"test"}
+    [decoded] => Array
+        (
+            [contact_no] => 0763904365
+            [employee_id] => 26
+            [manager_id] => 14
+            [vehicle_no] => CAD-7412
+            [from_date] => 2026-06-19
+            [to_date] => 2026-06-19
+            [chauffer_phone] => 0763904365
+            [chauffer_name] => Induru Udantha
+            [reason] => Personal Request
+            [vehicle_type] => Car
+            [vehicle_id] => 106
+            [remark] => test
+        )
+
+)
+
+------------------------------------------------------------
+[2026-06-19 11:28:54] Transport created
+Array
+(
+    [transport_id] => 
+    [vehicle_id] => 106
+)
+
+------------------------------------------------------------
+[2026-06-19 11:28:54] Sending rental sync request
+Array
+(
+    [url] => http://127.0.0.1:8000/api/rental-sync
+    [payload] => Array
+        (
+            [booking_number] => PERSONAL-19
+            [vehicle_id] => 106
+            [company_id] => 1
+            [driver_name] => Induru Udantha
+            [arrival_date] => 2026-06-19 00:00:00
+            [departure_date] => 2026-06-19 23:59:59
+            [passengers] => 
+            [status] => booked
+            [created_by] => 1
+            [transport_id] => 
+            [vehicle_no] => CAD-7412
+            [reason] => Personal Request
+            [contact_no] => 0763904365
+            [vehicle_type] => Car
+        )
+
+)
+
+------------------------------------------------------------
+[2026-06-19 11:28:56] Rental sync response
+Array
+(
+    [success] => 
+    [status] => 0
+    [error] => Failed to connect to 127.0.0.1 port 8000 after 2033 ms: Couldn't connect to server
+    [raw] => 
+    [decoded] => 
+)
+
+------------------------------------------------------------
+[2026-06-19 11:28:56] Rental sync failed
+Array
+(
+    [transport_id] => 
+    [rental] => Array
+        (
+            [success] => 
+            [status] => 0
+            [error] => Failed to connect to 127.0.0.1 port 8000 after 2033 ms: Couldn't connect to server
+            [raw] => 
+            [decoded] => 
+        )
+
+)
+
+------------------------------------------------------------
+[2026-06-19 11:29:06] Incoming request
+Array
+(
+    [raw] => {"contact_no":"0763904365","employee_id":"26","manager_id":"14","vehicle_no":"CAD-7412","from_date":"2026-06-19","to_date":"2026-06-19","chauffer_phone":"0763904365","chauffer_name":"Induru Udantha","reason":"Personal Request","vehicle_type":"Car","vehicle_id":106,"remark":"test"}
+    [decoded] => Array
+        (
+            [contact_no] => 0763904365
+            [employee_id] => 26
+            [manager_id] => 14
+            [vehicle_no] => CAD-7412
+            [from_date] => 2026-06-19
+            [to_date] => 2026-06-19
+            [chauffer_phone] => 0763904365
+            [chauffer_name] => Induru Udantha
+            [reason] => Personal Request
+            [vehicle_type] => Car
+            [vehicle_id] => 106
+            [remark] => test
+        )
+
+)
+
+------------------------------------------------------------
