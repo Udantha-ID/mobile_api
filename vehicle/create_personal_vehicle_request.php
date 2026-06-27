@@ -31,7 +31,7 @@ function generateBookingNumber($type = "PERSONAL") {
 }
 
 function sendRentalToExploreDrive($payload) {
-    $url = "http://127.0.0.1:8000/api/rental-sync";
+    //$url = "http://127.0.0.1:8000/api/rental-sync";
     $secret = "123456789";
 
     writeLog("Sending rental sync request", [

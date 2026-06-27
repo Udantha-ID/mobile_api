@@ -18,6 +18,7 @@ if (($_SERVER["REQUEST_METHOD"] ?? "") !== "POST") {
 $transport_service_id = trim($_POST["transport_service_id"] ?? "");
 $end_meter            = trim($_POST["end_meter"]            ?? "");
 $end_fuel             = trim($_POST["end_fuel"]             ?? "");
+$remark               = trim($_POST["end_vehicle_remark"] ?? "") ?: null;
 
 if ($transport_service_id === "" || !ctype_digit($transport_service_id))
     respond(false, "transport_service_id required numeric");
@@ -29,8 +30,9 @@ if (!isset($_FILES["photo"]) || $_FILES["photo"]["error"] !== UPLOAD_ERR_OK)
     respond(false, "photo is required");
 
 $transport_service_id = (int)$transport_service_id;
-$end_meter            = (int)$end_meter;
+$end_meter            = (int)$end_meter;    
 $end_fuel             = (float)$end_fuel;
+
 
 try {
     $conn->begin_transaction();
@@ -99,11 +101,12 @@ try {
             trip_end_odometer       = ?,
             trip_end_odometer_photo = ?,
             end_trip_fuel           = ?,
+            end_vehicle_remark      = ?,
             change_vehicle_datetime = NOW(),
             updated_at              = NOW()
         WHERE trip_detail_id = ?
     ");
-    $upd->bind_param("isdi", $end_meter, $dbPhotoPath, $end_fuel, $trip_detail_id);
+    $upd->bind_param("isdsi", $end_meter, $dbPhotoPath, $end_fuel, $remark, $trip_detail_id);
     $upd->execute();
     $upd->close();
 

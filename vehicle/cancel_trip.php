@@ -25,7 +25,7 @@ function writeLog($title, $data = null) {
 }
 
 function cancelRentalInExploreDrive($transportId) {
-  $url = "https://srilankaautorentals.com/api/rental-cancel";
+  //$url = "https://srilankaautorentals.com/api/rental-cancel";
   $secret = "123456789";
 
   $payload = [

@@ -104,3 +104,86 @@ Array
 )
 
 ------------------------------------------------------------
+[2026-06-23 07:25:05] Incoming request
+Array
+(
+    [raw] => {"contact_no":"0714357976","employee_id":"19","manager_id":"84","vehicle_no":"CAD-7412","from_date":"2026-06-23","to_date":"2026-06-23","chauffer_phone":"0714357976","chauffer_name":"Srimal kamaral","reason":"Personal Request","vehicle_type":"Car","vehicle_id":106,"remark":"test"}
+    [decoded] => Array
+        (
+            [contact_no] => 0714357976
+            [employee_id] => 19
+            [manager_id] => 84
+            [vehicle_no] => CAD-7412
+            [from_date] => 2026-06-23
+            [to_date] => 2026-06-23
+            [chauffer_phone] => 0714357976
+            [chauffer_name] => Srimal kamaral
+            [reason] => Personal Request
+            [vehicle_type] => Car
+            [vehicle_id] => 106
+            [remark] => test
+        )
+
+)
+
+------------------------------------------------------------
+[2026-06-23 07:25:05] Transport created
+Array
+(
+    [transport_id] => 
+    [vehicle_id] => 106
+)
+
+------------------------------------------------------------
+[2026-06-23 07:25:05] Sending rental sync request
+Array
+(
+    [url] => 
+    [payload] => Array
+        (
+            [booking_number] => PERSONAL-80
+            [vehicle_id] => 106
+            [company_id] => 1
+            [driver_name] => Srimal kamaral
+            [arrival_date] => 2026-06-23 00:00:00
+            [departure_date] => 2026-06-23 23:59:59
+            [passengers] => 
+            [status] => booked
+            [created_by] => 1
+            [transport_id] => 
+            [vehicle_no] => CAD-7412
+            [reason] => Personal Request
+            [contact_no] => 0714357976
+            [vehicle_type] => Car
+        )
+
+)
+
+------------------------------------------------------------
+[2026-06-23 07:25:05] Rental sync response
+Array
+(
+    [success] => 
+    [status] => 0
+    [error] => No URL set
+    [raw] => 
+    [decoded] => 
+)
+
+------------------------------------------------------------
+[2026-06-23 07:25:05] Rental sync failed
+Array
+(
+    [transport_id] => 
+    [rental] => Array
+        (
+            [success] => 
+            [status] => 0
+            [error] => No URL set
+            [raw] => 
+            [decoded] => 
+        )
+
+)
+
+------------------------------------------------------------
