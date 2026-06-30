@@ -104,7 +104,7 @@ try {
 
 // HR Manager (10) + GM (14) + MD (11) — only available ones
 // Add more employee IDs here anytime you need a new fixed approver
-$fixedApproverIds = [10, 14, 11];
+$fixedApproverIds = [45, 14, 11];
 
 foreach ($fixedApproverIds as $fixedId) {
   if (isset($addedIds[$fixedId])) continue;      // skip if already added (e.g. reporting manager is one of these)
@@ -120,7 +120,7 @@ foreach ($fixedApproverIds as $fixedId) {
   // ── 3. Resolve BEST single manager for personal vehicle form ──────────
   // Fallback chain (used when reporting manager is unavailable):
   //   Reporting Manager → HR Manager (10) → GM (14) → MD (11)
-  $fallbackChain = [10, 14, 11];
+  $fallbackChain = [45, 14, 11];
 
   $resolvedId   = null;
   $resolvedInfo = null;
