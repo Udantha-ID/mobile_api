@@ -13,7 +13,7 @@
 $host = "localhost";
 $user = "root";
 $pass = "";
-$db = "explore_";
+$db = "explores_";
 
 $conn = new mysqli($host, $user, $pass, $db);
 
