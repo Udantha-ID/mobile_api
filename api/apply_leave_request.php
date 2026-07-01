@@ -1,6 +1,7 @@
 <?php
 header("Content-Type: application/json; charset=UTF-8");
 require_once __DIR__ . "/../assets/includes/db_connect.php";
+require_once __DIR__ . "/../assets/includes/leave_balance_helper.php";
 
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
@@ -40,6 +41,7 @@ try {
   $address         = trim((string)($data["address"] ?? ""));
   $halfDaySession  = strtoupper(trim((string)($data["halfDaySession"] ?? ""))); // MORNING/EVENING or ""
   $managerId = (int)($data["managerId"] ?? 0);
+  $acknowledgeNoPay = (int)($data["acknowledgeNoPay"] ?? 0);
 
   // Required
   if ($employeeId <= 0 || $leavePolicyId <= 0 || $startDate === "" || $reason === "") {
@@ -91,61 +93,34 @@ try {
   $leaveTypeName = "Leave";
 
   switch ($leavePolicyId) {
-    case 1:
-      $leaveTypeName = "Annual Leave";
-      break;
-    case 2:
-      $leaveTypeName = "Medical Leave";
-      break;
-    case 3:
-      $leaveTypeName = "Casual Leave";
-      break;
+    case 1: $leaveTypeName = "Annual Leave"; break;
+    case 2: $leaveTypeName = "Medical Leave"; break;
+    case 3: $leaveTypeName = "Casual Leave"; break;
   }
 
+  $paidDays  = $days;
+  $noPayDays = 0.0;
   $remaining = null;
 
   if ($mustCheckBalance) {
+      $bal = getLeaveRemaining($conn, $employeeId, $leavePolicyId);
+      $remaining = $bal["remaining"];
 
-    // 1) Try current remaining from employee_leave_balances
-    $sqlBal = "
-      SELECT remaining
-      FROM employee_leave_balances
-      WHERE employee_id = ? AND leave_policy_id = ?
-      LIMIT 1
-    ";
-    $st = $conn->prepare($sqlBal);
-    $st->bind_param("ii", $employeeId, $leavePolicyId);
-    $st->execute();
-    $row = $st->get_result()->fetch_assoc();
-    $st->close();
+      [$paidDays, $noPayDays] = splitPaidNoPay($days, $remaining);
 
-    if ($row) {
-      $remaining = (float)$row["remaining"];
-    } else {
-      // 2) Fallback: use yearly entitlement for new employees
-      $sqlEnt = "
-        SELECT leave_entitlement
-        FROM employee_yearly_leave_balance
-        WHERE employee_id = ? AND leave_policy_id = ?
-        LIMIT 1
-      ";
-      $st = $conn->prepare($sqlEnt);
-      $st->bind_param("ii", $employeeId, $leavePolicyId);
-      $st->execute();
-      $rowEnt = $st->get_result()->fetch_assoc();
-      $st->close();
-
-      $remaining = $rowEnt ? (float)$rowEnt["leave_entitlement"] : 0.0;
-    }
-
-    // 3) Validate
-    if ($remaining <= 0) {
-      respond(false, "You don't have available $leaveTypeName Balance");
-    }
-
-    if ($days > $remaining) {
-      respond(false, "Not enough $leaveTypeName balance. Remaining: {$remaining} day(s).");
-    }
+      if ($noPayDays > 0 && $acknowledgeNoPay !== 1) {
+          respond(false,
+              "You have {$remaining} day(s) of $leaveTypeName remaining. " .
+              "{$paidDays} day(s) will be paid and {$noPayDays} day(s) will be " .
+              "submitted as No Pay Leave. Please confirm to proceed.",
+              [
+                  "requires_no_pay_confirmation" => true,
+                  "remaining"   => $remaining,
+                  "paid_days"   => $paidDays,
+                  "no_pay_days" => $noPayDays,
+              ]
+          );
+      }
   }
 
   // Reliever can be NULL
@@ -155,28 +130,31 @@ try {
   $sqlIns = "
     INSERT INTO leave_requests
       (employee_id, leave_policy_id, leave_start_date, leave_end_date, number_of_days,
+      paid_days, no_pay_days,
       half_day_session, reason, oversee_member_id, manager_id,
       is_special_request, address, status, requested_at, updated_at)
     VALUES
-      (?, ?, ?, ?, ?,
+      (?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, 'PENDING', NOW(), NOW())
   ";
 
   $stmt = $conn->prepare($sqlIns);
   $stmt->bind_param(
-      "iissdsssiis",   // ← 11 chars: i,i,s,s,d,s,s,s,i,i,s
-      $employeeId,     // i
-      $leavePolicyId,  // i
-      $startDate,      // s
-      $endDate,        // s
-      $days,           // d
-      $halfDaySession, // s
-      $reason,         // s
+      "iissdddsssiis",  // ← 13 chars
+      $employeeId,      // i
+      $leavePolicyId,   // i
+      $startDate,       // s
+      $endDate,         // s
+      $days,            // d
+      $paidDays,        // d
+      $noPayDays,       // d
+      $halfDaySession,  // s
+      $reason,          // s
       $overseeMemberIdDb, // s
-      $managerId,      // i
-      $isSpecial,      // i
-      $address         // s
+      $managerId,       // i
+      $isSpecial,       // i
+      $address          // s
   );
   $stmt->execute();
   $leaveRequestId = (int)$conn->insert_id;
@@ -258,7 +236,9 @@ try {
   // Done
   respond(true, "Leave request submitted", [
     "leave_request_id" => $leaveRequestId,
-    "remaining" => $remaining,
+    "remaining"  => $remaining,
+    "paid_days"  => $paidDays,
+    "no_pay_days" => $noPayDays,
   ]);
 
 } catch (Throwable $e) {
