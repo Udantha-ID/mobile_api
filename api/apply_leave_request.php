@@ -68,8 +68,8 @@ try {
     $halfDaySession = null; // store NULL in DB
   }
 
-  // Balance check only for Annual/Medical/Casual (policy 1,2,3)
-  $mustCheckBalance = in_array($leavePolicyId, [1, 2, 3], true);
+  // Balance check for Annual/Medical/Casual (1,2,3) and Half Day (4 → Casual Leave 3)
+  $mustCheckBalance = in_array($leavePolicyId, [1, 2, 3, 4], true);
 
   // ---------- 1) OVERLAP CHECK (block only PENDING / APPROVED) ----------
   $sqlOverlap = "
@@ -103,14 +103,19 @@ try {
   $remaining = null;
 
   if ($mustCheckBalance) {
-      $bal = getLeaveRemaining($conn, $employeeId, $leavePolicyId);
+      // Half Day (4) borrows from Casual Leave (3) balance — always 0.5 days
+      $checkPolicyId = ($leavePolicyId === 4) ? 3 : $leavePolicyId;
+      $checkDays     = ($leavePolicyId === 4) ? 0.5 : $days;
+      $balanceName   = ($leavePolicyId === 4) ? "Casual Leave" : $leaveTypeName;
+
+      $bal = getLeaveRemaining($conn, $employeeId, $checkPolicyId);
       $remaining = $bal["remaining"];
 
-      [$paidDays, $noPayDays] = splitPaidNoPay($days, $remaining);
+      [$paidDays, $noPayDays] = splitPaidNoPay($checkDays, $remaining);
 
       if ($noPayDays > 0 && $acknowledgeNoPay !== 1) {
           respond(false,
-              "You have {$remaining} day(s) of $leaveTypeName remaining. " .
+              "You have {$remaining} day(s) of $balanceName remaining. " .
               "{$paidDays} day(s) will be paid and {$noPayDays} day(s) will be " .
               "submitted as No Pay Leave. Please confirm to proceed.",
               [
