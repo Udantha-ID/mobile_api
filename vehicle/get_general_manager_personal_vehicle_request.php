@@ -101,17 +101,12 @@ try {
       jt.job_title_id,
       jt.name AS job_title_name,
 
-      COALESCE(epvu.usage_count, 0) AS usage_count,
-      CASE
-        WHEN epvu.employee_id IS NULL THEN 1
-        ELSE epvu.usage_count + 1
-      END AS current_attempt
+      ts.attempt_number
 
     FROM transport_services ts
     JOIN employees e ON e.employee_id = ts.employee_id
     LEFT JOIN employee_job ej2 ON ej2.employee_id = ts.employee_id
     LEFT JOIN job_titles jt ON jt.job_title_id = ej2.job_title_id
-    LEFT JOIN employee_personal_vehicle_usage epvu ON epvu.employee_id = ts.employee_id
 
     WHERE ts.type = 'personal'
       AND ts.deleted_at IS NULL
@@ -134,8 +129,16 @@ try {
       ? date("Y-m-d", strtotime($row["assigned_start_at"])) : "";
     $row["to_date"] = $row["assigned_end_at"]
       ? date("Y-m-d", strtotime($row["assigned_end_at"])) : "";
-    $attempt = (int)$row["current_attempt"];
-    $row["attempt_label"] = $attempt === 1 ? "First Attempt" : "$attempt Attempt";
+    $attempt = (int)($row["attempt_number"] ?? 0);
+    if ($attempt <= 0) {
+        $row["attempt_label"] = "—";
+    } elseif ($attempt >= 6) {
+        $row["attempt_label"] = "6th+ Attempt";
+    } else {
+        $suffixes = [1 => "st", 2 => "nd", 3 => "rd"];
+        $suffix   = $suffixes[$attempt] ?? "th";
+        $row["attempt_label"] = "{$attempt}{$suffix} Attempt";
+    }
     $rows[] = $row;
   }
 

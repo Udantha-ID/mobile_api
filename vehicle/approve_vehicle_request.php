@@ -130,15 +130,7 @@ function getFinalApprover($conn): ?array {
 }
 
 function recordUsage($conn, int $employeeId): void {
-  $u = $conn->prepare("
-    INSERT INTO employee_personal_vehicle_usage
-        (employee_id, usage_count, charge_per_request, created_at, updated_at)
-    VALUES (?, 1, 0.00, NOW(), NOW())
-    ON DUPLICATE KEY UPDATE usage_count = usage_count + 1, updated_at = NOW()
-  ");
-  $u->bind_param("i", $employeeId);
-  $u->execute();
-  $u->close();
+  // Disabled: slot usage is now tracked via transport_services.attempt_number
 }
 
 try {

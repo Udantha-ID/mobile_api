@@ -42,13 +42,7 @@ try {
 
             jt.name AS job_title_name,
 
-            -- personal vehicle usage details
-            COALESCE(epvu.usage_count, 0) AS usage_count,
-
-            CASE
-                WHEN epvu.employee_id IS NULL THEN 1
-                ELSE epvu.usage_count + 1
-            END AS current_attempt
+            ts.attempt_number
 
         FROM transport_services ts
 
@@ -60,9 +54,6 @@ try {
 
         LEFT JOIN job_titles jt
             ON jt.job_title_id = ej.job_title_id
-
-        LEFT JOIN employee_personal_vehicle_usage epvu
-            ON epvu.employee_id = ts.employee_id
 
         WHERE ts.manager_id = ?
             AND ts.status = 'PENDING'
@@ -90,11 +81,15 @@ try {
             ? date("Y-m-d", strtotime($row["assigned_end_at"]))
             : "";
 
-        // optional readable label
-        if ((int)$row["current_attempt"] === 1) {
-            $row["attempt_label"] = "First Attempt";
+        $attempt = (int)($row["attempt_number"] ?? 0);
+        if ($attempt <= 0) {
+            $row["attempt_label"] = "—";
+        } elseif ($attempt >= 6) {
+            $row["attempt_label"] = "6th+ Attempt";
         } else {
-            $row["attempt_label"] = $row["current_attempt"] . " Attempt";
+            $suffixes = [1 => "st", 2 => "nd", 3 => "rd"];
+            $suffix   = $suffixes[$attempt] ?? "th";
+            $row["attempt_label"] = "{$attempt}{$suffix} Attempt";
         }
 
         $rows[] = $row;

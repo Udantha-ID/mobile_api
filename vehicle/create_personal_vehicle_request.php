@@ -103,8 +103,9 @@ $chauffer_phone = trim($body["chauffer_phone"]  ?? "");
 $chauffer_name  = trim($body["chauffer_name"]   ?? "");
 $vehicle_id     = (int)($body["vehicle_id"]     ?? 0);
 // ── Optional fields ───────────────────────────────────────────────────────
-$remark = (isset($body["remark"]) && $body["remark"] !== "")
+$remark         = (isset($body["remark"]) && $body["remark"] !== "")
     ? trim($body["remark"]) : null;
+$attempt_number = (int)($body["attempt_number"] ?? 0);
 
 // ── Validate ──────────────────────────────────────────────────────────────
 if ($employee_id    <= 0) respond(false, "employee_id required");
@@ -115,6 +116,7 @@ if ($to_date       === "") respond(false, "to_date required");
 if ($chauffer_phone === "") respond(false, "chauffer_phone required");
 if ($chauffer_name  === "") respond(false, "chauffer_name required");
 if ($vehicle_id     <= 0) respond(false, "vehicle_id required");
+if ($attempt_number < 1 || $attempt_number > 6) respond(false, "Invalid attempt number");
 
 // ── Build values ──────────────────────────────────────────────────────────
 $assigned_start_at = $from_date . " 00:00:00";
@@ -157,15 +159,31 @@ try {
     }
     $checkStmt->close();
 
+    // ── Duplicate slot check ──────────────────────────────────────────────
+    $dupStmt = $conn->prepare("
+        SELECT id FROM transport_services
+        WHERE employee_id = ? AND attempt_number = ?
+          AND type = 'personal'
+          AND status NOT IN ('REJECTED','CANCELLED')
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+    $dupStmt->bind_param("ii", $employee_id, $attempt_number);
+    $dupStmt->execute();
+    if ($dupStmt->get_result()->num_rows > 0) {
+        respond(false, "This attempt slot is already used.");
+    }
+    $dupStmt->close();
+
     // ── Insert ────────────────────────────────────────────────────────────
     $stmt = $conn->prepare("
         INSERT INTO transport_services (
-            source_id, type, vehicle_type, vehicle_id, vehicle_no,
+            source_id, type, attempt_number, vehicle_type, vehicle_id, vehicle_no,
             chauffer_phone, chauffer_name, employee_id, manager_id, status,
             assigned_start_at, pickup_location, dropoff_location, assigned_end_at,
             passenger_count, trip_code, remark, created_at, updated_at
         ) VALUES (
-            0, ?, ?, ?, ?,
+            0, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?,
             ?, ?, ?, ?,
             1, NULL, ?, NOW(), NOW()
@@ -173,8 +191,9 @@ try {
     ");
 
     $stmt->bind_param(
-        "ssisssssssssss",   // ← 14 chars now (was "ssissssssssss" = 13)
+        "siissssssssssss",  // 15 chars: type(s), attempt_number(i), vehicle_type(s), vehicle_id(i), ...
         $type,              // s
+        $attempt_number,    // i
         $vehicle_type,      // s
         $vehicle_id,        // i
         $vehicle_no,        // s
@@ -187,7 +206,7 @@ try {
         $pickup_location,   // s
         $dropoff_location,  // s
         $assigned_end_at,   // s
-        $remark             // s 
+        $remark             // s
     );
 
     $stmt->execute();
@@ -207,7 +226,7 @@ try {
         "driver_name"    => $chauffer_name,
         "arrival_date"   => $assigned_start_at,
         "departure_date" => $assigned_end_at,
-        "passengers"     => $passenger_count,
+        "passengers"     => 1,
         "status"         => "booked",
         "created_by"     => 1,
 
